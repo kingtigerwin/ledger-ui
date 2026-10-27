@@ -233,20 +233,6 @@ export const handlers = [
     withAdmin(({ params }) => setStatus(String(params.id), 'disabled')),
   ),
 
-  http.delete(
-    '*/api/v1/admin/users/:id',
-    withAdmin(({ params }) => {
-      const id = String(params.id)
-      const user = db.users.get(id)
-      if (!user) return apiError(404, 'user_not_found', 'No such user')
-      if (user.role === 'admin') {
-        return apiError(409, 'cannot_delete_admin', "Admins can't be deleted")
-      }
-      db.users.delete(id)
-      return new HttpResponse(null, { status: 204 })
-    }),
-  ),
-
   http.post(
     '*/agent/v1/chat',
     withUser(async (_, { request }) =>

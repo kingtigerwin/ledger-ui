@@ -1,5 +1,5 @@
 import { screen, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { findUser } from '../mocks/handlers'
 import { renderApp, signIn } from '../test/renderApp'
 
@@ -20,10 +20,6 @@ async function signOutAndSignInAs(
 }
 
 describe('given sisi on the Users page', () => {
-  beforeEach(() => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-  })
-
   it('lists the pending users', async () => {
     await openUsersAsSisi()
     const list = await screen.findByRole('list', { name: /pending users/i })
@@ -54,22 +50,6 @@ describe('given sisi on the Users page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /invalid username or password/i,
     )
-  })
-
-  it('deletes a user after confirming', async () => {
-    const { user } = await openUsersAsSisi()
-    await user.click(await screen.findByRole('button', { name: 'Delete bob' }))
-    expect(window.confirm).toHaveBeenCalled()
-    expect(await screen.findByText(/no pending users/i)).toBeInTheDocument()
-    expect(findUser('bob')).toBeUndefined()
-  })
-
-  it('keeps a user when the delete is not confirmed', async () => {
-    vi.mocked(window.confirm).mockReturnValue(false)
-    const { user } = await openUsersAsSisi()
-    await user.click(await screen.findByRole('button', { name: 'Delete bob' }))
-    expect(findUser('bob')).toBeDefined()
-    expect(screen.getByText('bob')).toBeInTheDocument()
   })
 
   it('offers no actions on admins', async () => {

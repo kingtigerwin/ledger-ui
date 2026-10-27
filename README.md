@@ -5,7 +5,7 @@ The web UI for [ledger-api](https://github.com/kingtigerwin/ledger-api) and [led
 - **Sign in** (`/login`): username and password. Active users go to the chat; pending users are told they're waiting for approval.
 - **Register** (`/register`, linked from sign in): creates a `pending` account.
 - **Chat** (`/chat`, signed-in only): describe spending in plain words; ledger-agent records it or answers questions about it.
-- **Users** (`/admin`, admins such as `sisi` only): pending, active and disabled users. Approve enables a user; Reject disables them; Delete removes them.
+- **Users** (`/admin`, admins such as `sisi` only): pending, active and disabled users. Approve enables a user (they can then sign in); Reject disables them (they can't).
 
 ## How it fits together
 
