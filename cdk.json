@@ -1,0 +1,14 @@
+{
+  "app": "npx tsx infra/bin/app.ts",
+  "context": {
+    "customDomain": {
+      "domainName": "ledger.haoran.cloud",
+      "zoneName": "haoran.cloud",
+      "hostedZoneId": "Z5UXKBB5IU578"
+    },
+    "apiOrigin": "api.haoran.cloud",
+    "agentOrigin": "agent.haoran.cloud",
+    "githubSubjectPrefix": "repo:kingtigerwin@9473411/ledger-ui@1435488353",
+    "@aws-cdk/core:defaultCrossStackReferences": "strong"
+  }
+}

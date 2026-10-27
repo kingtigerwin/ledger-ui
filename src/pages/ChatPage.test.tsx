@@ -1,0 +1,130 @@
+import { screen, within } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
+import { describe, expect, it } from 'vitest'
+import type { ChatRequest } from '../api/types'
+import { endSession, expireAccessTokens } from '../mocks/handlers'
+import { server } from '../mocks/server'
+import { renderApp, signIn } from '../test/renderApp'
+import { EXAMPLE_PROMPTS } from '../constants'
+
+async function openChat() {
+  const app = renderApp('/login')
+  await signIn(app.user, 'alice', 'alice-password')
+  return {
+    ...app,
+    input: await screen.findByLabelText(/describe your spending/i),
+  }
+}
+
+describe('given alice on the chat page', () => {
+  it('disables Send when the input is empty', async () => {
+    const { user, input } = await openChat()
+    const send = screen.getByRole('button', { name: /send/i })
+    expect(send).toBeDisabled()
+    await user.type(input, '   ')
+    expect(send).toBeDisabled()
+  })
+
+  it('records an expense and shows it', async () => {
+    const { user, input } = await openChat()
+    await user.type(input, 'Coffee at Starbucks for $5{Enter}')
+
+    const log = screen.getByRole('log')
+    expect(within(log).getByText(/coffee at starbucks/i)).toBeInTheDocument()
+    expect(await screen.findByText('Recorded $5.00.')).toBeInTheDocument()
+    expect(screen.getByText('Recorded')).toBeInTheDocument()
+    expect(screen.getByText('$5.00')).toBeInTheDocument()
+  })
+
+  it('shows a monthly summary', async () => {
+    const { user, input } = await openChat()
+    await user.type(input, 'Cake for 30 dollars{Enter}')
+    await screen.findByText('Recorded $30.00.')
+    await user.type(
+      screen.getByLabelText(/describe your spending/i),
+      'How much have I spent this month?{Enter}',
+    )
+    expect(await screen.findByTestId('summary-total')).toHaveTextContent(
+      '$30.00',
+    )
+  })
+
+  it('sends the conversation so far, with the time zone', async () => {
+    const requests: ChatRequest[] = []
+    server.events.on('request:start', async ({ request }) => {
+      if (request.url.endsWith('/agent/v1/chat')) {
+        requests.push((await request.clone().json()) as ChatRequest)
+      }
+    })
+    const { user, input } = await openChat()
+    await user.type(input, 'I bought lunch{Enter}')
+    await screen.findByText(/how much did you spend/i)
+    await user.type(
+      screen.getByLabelText(/describe your spending/i),
+      '$12{Enter}',
+    )
+    await screen.findByText('Recorded $12.00.')
+
+    expect(requests.at(-1)?.messages).toEqual([
+      { role: 'user', content: 'I bought lunch' },
+      { role: 'assistant', content: 'How much did you spend, and on what?' },
+      { role: 'user', content: '$12' },
+    ])
+    expect(requests.at(-1)?.timeZone).toBeTruthy()
+    server.events.removeAllListeners()
+  })
+
+  it('gets a new access token when the old one has expired', async () => {
+    const { user, input } = await openChat()
+    expireAccessTokens()
+    await user.type(input, 'Spent $6 on coffee{Enter}')
+    expect(await screen.findByText('Recorded $6.00.')).toBeInTheDocument()
+  })
+
+  it('goes back to the login page when the session has ended', async () => {
+    const { user, input } = await openChat()
+    expireAccessTokens()
+    endSession()
+    await user.type(input, 'Spent $6 on coffee{Enter}')
+    expect(
+      await screen.findByRole('heading', { name: /sign in/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows an error and recovers on retry', async () => {
+    server.use(
+      http.post(
+        '*/agent/v1/chat',
+        () =>
+          HttpResponse.json(
+            { error: { code: 'unavailable', message: 'Try again shortly' } },
+            { status: 503 },
+          ),
+        { once: true },
+      ),
+    )
+    const { user, input } = await openChat()
+    await user.type(input, 'Spent $6 on coffee{Enter}')
+
+    expect(await screen.findByText('Try again shortly')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+
+    expect(await screen.findByText('Recorded $6.00.')).toBeInTheDocument()
+    expect(screen.queryByText('Try again shortly')).toBeNull()
+    expect(screen.getAllByText('Spent $6 on coffee')).toHaveLength(1)
+  })
+
+  it('fills the input when an example prompt is clicked', async () => {
+    const { user, input } = await openChat()
+    await user.click(screen.getByRole('button', { name: EXAMPLE_PROMPTS[0] }))
+    expect(input).toHaveValue(EXAMPLE_PROMPTS[0])
+  })
+
+  it('clears the conversation with New chat', async () => {
+    const { user, input } = await openChat()
+    await user.type(input, 'Spent $6 on coffee{Enter}')
+    await screen.findByText('Recorded $6.00.')
+    await user.click(screen.getByRole('button', { name: /new chat/i }))
+    expect(screen.getByText(/what did you spend today/i)).toBeInTheDocument()
+  })
+})
