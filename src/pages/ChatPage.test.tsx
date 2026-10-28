@@ -2,7 +2,11 @@ import { screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import type { ChatRequest } from '../api/types'
-import { endSession, expireAccessTokens } from '../mocks/handlers'
+import {
+  endSession,
+  expireAccessTokens,
+  seedTransaction,
+} from '../mocks/handlers'
 import { server } from '../mocks/server'
 import { renderApp, signIn } from '../test/renderApp'
 import { EXAMPLE_PROMPTS } from '../constants'
@@ -120,11 +124,48 @@ describe('given alice on the chat page', () => {
     expect(input).toHaveValue(EXAMPLE_PROMPTS[0])
   })
 
+  it("doesn't list other people's transactions", async () => {
+    seedTransaction('sisi', 1200)
+    const { user, input } = await openChat()
+    await user.type(input, "Show everyone's transactions{Enter}")
+    expect(
+      await screen.findByText('How much did you spend, and on what?'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Found')).toBeNull()
+  })
+
   it('clears the conversation with New chat', async () => {
     const { user, input } = await openChat()
     await user.type(input, 'Spent $6 on coffee{Enter}')
     await screen.findByText('Recorded $6.00.')
     await user.click(screen.getByRole('button', { name: /new chat/i }))
     expect(screen.getByText(/what did you spend today/i)).toBeInTheDocument()
+  })
+})
+
+describe('given sisi, an admin, on the chat page', () => {
+  it("lists everyone's transactions with whose they are and subtotals", async () => {
+    seedTransaction('alice', 500)
+    seedTransaction('sisi', 1200)
+    seedTransaction('alice', 3000)
+    const app = renderApp('/login')
+    await signIn(app.user, 'sisi', 'sisi-password')
+    await app.user.type(
+      await screen.findByLabelText(/describe your spending/i),
+      "Show everyone's transactions{Enter}",
+    )
+
+    expect(
+      await screen.findByText("Here are everyone's transactions."),
+    ).toBeInTheDocument()
+    expect(screen.getAllByText(/^alice · /)).toHaveLength(2)
+    expect(screen.getAllByText(/^sisi · /)).toHaveLength(1)
+    const subtotals = screen.getByRole('list', { name: /by person/i })
+    expect(
+      within(subtotals)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent),
+    ).toEqual(['alice$35.00', 'sisi$12.00'])
+    expect(screen.getByTestId('transaction-total')).toHaveTextContent('$47.00')
   })
 })

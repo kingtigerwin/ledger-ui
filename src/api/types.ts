@@ -29,6 +29,10 @@ export interface Transaction {
   amountCents: number
   currency: string
   note?: string
+  /** Whose item this is; set on listed items when an admin lists everyone's transactions. */
+  userId?: string
+  /** Null when the owner's username couldn't be found. */
+  username?: string | null
 }
 
 export interface MonthlySummary {
