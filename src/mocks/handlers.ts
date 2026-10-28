@@ -15,11 +15,13 @@ interface MockUser extends AdminUser {
   password: string
 }
 
+type MockTransaction = Transaction & { userId: string }
+
 const db = {
   users: new Map<string, MockUser>(),
   sessionUserId: null as string | null,
   tokenGeneration: 0,
-  transactions: [] as Transaction[],
+  transactions: [] as MockTransaction[],
 }
 
 let nextId = 1
@@ -50,6 +52,28 @@ export function resetMockDb() {
   seedUser('alice', 'alice-password', { status: 'active' })
   seedUser('bob', 'bob-password')
 }
+
+/** Records an expense for `username`, as if they had told the agent about it. */
+export function seedTransaction(username: string, amountCents: number) {
+  const user = findUser(username)
+  if (!user) throw new Error(`No mock user ${username}`)
+  db.transactions.push(newTransaction(user.id, amountCents))
+}
+
+const newTransaction = (
+  userId: string,
+  amountCents: number,
+): MockTransaction => ({
+  id: `txn-${nextId++}`,
+  date: '2026-10-27',
+  category: 'other',
+  item: 'expense',
+  amountCents,
+  currency: 'AUD',
+  userId,
+})
+
+const withoutOwner = ({ userId: _userId, ...t }: MockTransaction) => t
 
 /** Makes every access token issued so far fail with 401, as if 15 minutes had passed. */
 export function expireAccessTokens() {
@@ -117,12 +141,27 @@ function setStatus(id: string, status: UserStatus) {
   return HttpResponse.json(publicUser(user))
 }
 
-/** A tiny "agent": records "$N" / "N dollars" messages and answers "this month" questions. */
-function chat({ messages }: ChatRequest): ChatResponse {
+/**
+ * A tiny "agent": records "$N" / "N dollars" messages, answers "this month" questions, and
+ * lists everyone's transactions for an admin, as list_all_transactions does.
+ */
+function chat(user: MockUser, { messages }: ChatRequest): ChatResponse {
   const text = messages.at(-1)?.content ?? ''
   const empty = { transactions: [], listed: [], summaries: [] }
+  if (user.role === 'admin' && /everyone|all transactions/i.test(text)) {
+    return {
+      ...empty,
+      reply: "Here are everyone's transactions.",
+      listed: db.transactions.map((t) => ({
+        ...t,
+        username: db.users.get(t.userId)?.username ?? null,
+      })),
+    }
+  }
   if (/this month/i.test(text)) {
-    const totalCents = db.transactions.reduce((s, t) => s + t.amountCents, 0)
+    const totalCents = db.transactions
+      .filter((t) => t.userId === user.id)
+      .reduce((s, t) => s + t.amountCents, 0)
     return {
       ...empty,
       reply: 'Here is your spending this month.',
@@ -142,19 +181,15 @@ function chat({ messages }: ChatRequest): ChatResponse {
   if (!amount) {
     return { ...empty, reply: 'How much did you spend, and on what?' }
   }
-  const transaction: Transaction = {
-    id: `txn-${nextId++}`,
-    date: '2026-10-27',
-    category: 'other',
-    item: 'expense',
-    amountCents: Math.round(Number(amount[1] ?? amount[2]) * 100),
-    currency: 'AUD',
-  }
+  const transaction = newTransaction(
+    user.id,
+    Math.round(Number(amount[1] ?? amount[2]) * 100),
+  )
   db.transactions.push(transaction)
   return {
     ...empty,
     reply: `Recorded $${(transaction.amountCents / 100).toFixed(2)}.`,
-    transactions: [transaction],
+    transactions: [withoutOwner(transaction)],
   }
 }
 
@@ -235,8 +270,8 @@ export const handlers = [
 
   http.post(
     '*/agent/v1/chat',
-    withUser(async (_, { request }) =>
-      HttpResponse.json(chat((await request.json()) as ChatRequest)),
+    withUser(async (user, { request }) =>
+      HttpResponse.json(chat(user, (await request.json()) as ChatRequest)),
     ),
   ),
 ]
