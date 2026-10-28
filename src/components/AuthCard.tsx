@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 
 interface AuthCardProps {
   title: string
@@ -31,12 +31,17 @@ export function AuthCard({ title, subtitle, children }: AuthCardProps) {
 interface TextFieldProps {
   label: string
   name: string
-  type?: 'text' | 'password'
+  type?: 'text' | 'password' | 'email'
   value: string
   onChange: (value: string) => void
   autoComplete: string
   autoFocus?: boolean
+  /** Shown under the input, which is then marked invalid. */
+  error?: string | null
 }
+
+// ledger-api's limits: 64 for a username, 1024 for a password, 254 for an email address.
+const MAX_LENGTH = { text: 64, password: 1024, email: 254 }
 
 export function TextField({
   label,
@@ -46,7 +51,9 @@ export function TextField({
   onChange,
   autoComplete,
   autoFocus,
+  error,
 }: TextFieldProps) {
+  const errorId = useId()
   return (
     <label className="block">
       <span className="text-sm font-medium text-slate-700">{label}</span>
@@ -58,9 +65,16 @@ export function TextField({
         autoComplete={autoComplete}
         autoFocus={autoFocus}
         required
-        maxLength={type === 'password' ? 1024 : 64}
-        className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+        maxLength={MAX_LENGTH[type]}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        className={`mt-1 block w-full rounded-lg border px-3 py-2 text-base outline-none focus:ring-2 ${error ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-200'}`}
       />
+      {error && (
+        <span id={errorId} className="mt-1 block text-sm text-red-700">
+          {error}
+        </span>
+      )}
     </label>
   )
 }

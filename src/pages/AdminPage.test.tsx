@@ -27,6 +27,19 @@ describe('given sisi on the Users page', () => {
     expect(within(list).queryByText('alice')).toBeNull()
   })
 
+  it("shows each user's email, and nothing for users without one", async () => {
+    const { user } = await openUsersAsSisi()
+    const pending = await screen.findByRole('list', { name: /pending users/i })
+    expect(within(pending).getByText('bob@example.com')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: /active/i }))
+    const active = await screen.findByRole('list', { name: /active users/i })
+    expect(within(active).getByText('alice@example.com')).toBeInTheDocument()
+    expect(within(active).queryByText(/@/)).toHaveTextContent(
+      'alice@example.com',
+    )
+  })
+
   it('approves a pending user, who can then sign in to the chat', async () => {
     const { user } = await openUsersAsSisi()
     await user.click(await screen.findByRole('button', { name: 'Approve bob' }))

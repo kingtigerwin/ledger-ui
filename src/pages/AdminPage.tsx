@@ -116,6 +116,11 @@ export function AdminPage() {
                         </span>
                       )}
                     </div>
+                    {user.email && (
+                      <div className="truncate text-sm text-slate-600">
+                        {user.email}
+                      </div>
+                    )}
                     <div className="text-xs text-slate-500">
                       Registered {formatDate(user.createdAt.slice(0, 10))}
                     </div>

@@ -7,12 +7,20 @@ export class ApiError extends Error {
   readonly status: number
   /** ledger-api's stable error code, e.g. `account_pending`; `network_error` when unreachable. */
   readonly code: string
+  /** For `validation_failed`, the issues ledger-api found; each `path` names the field. */
+  readonly details?: { path: (string | number)[]; message: string }[]
 
-  constructor(status: number, code: string, message: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    details?: ApiError['details'],
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.details = details
   }
 }
 
@@ -55,6 +63,7 @@ export async function request<T>(
       error?.code ?? 'http_error',
       error?.message ??
         `Something went wrong (HTTP ${response.status}). Please try again.`,
+      error?.details,
     )
   }
   return data as T
@@ -66,10 +75,10 @@ export const login = (username: string, password: string) =>
     body: { username, password },
   })
 
-export const register = (username: string, password: string) =>
+export const register = (username: string, password: string, email: string) =>
   request<User>('/api/v1/auth/register', {
     method: 'POST',
-    body: { username, password },
+    body: { username, password, email },
   })
 
 export const logout = () =>

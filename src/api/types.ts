@@ -7,6 +7,8 @@ export interface User {
   username: string
   role: Role
   status: UserStatus
+  /** Users created before emails were collected, such as sisi, have none. */
+  email?: string
 }
 
 /** A row of `GET /api/v1/admin/users`. */

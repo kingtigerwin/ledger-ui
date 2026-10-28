@@ -1,6 +1,6 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { endSession } from '../mocks/handlers'
+import { endSession, findUser } from '../mocks/handlers'
 import { renderApp, signIn } from '../test/renderApp'
 
 describe('given a visitor who is not signed in', () => {
@@ -57,9 +57,13 @@ describe('given the register page', () => {
   it('creates a pending account that cannot sign in yet', async () => {
     const { user } = renderApp('/register')
     await user.type(screen.getByLabelText(/username/i), 'carol')
+    await user.type(screen.getByLabelText(/email/i), 'carol@example.com')
     await user.type(screen.getByLabelText(/password/i), 'carol-password')
     await user.click(screen.getByRole('button', { name: /create account/i }))
-    expect(await screen.findByRole('status')).toHaveTextContent(/pending/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Check your email: your account is waiting for approval.',
+    )
+    expect(findUser('carol')?.email).toBe('carol@example.com')
 
     await user.click(screen.getByRole('link', { name: /back to sign in/i }))
     await signIn(user, 'carol', 'carol-password')
@@ -71,9 +75,33 @@ describe('given the register page', () => {
   it('reports a taken username', async () => {
     const { user } = renderApp('/register')
     await user.type(screen.getByLabelText(/username/i), 'alice')
+    await user.type(screen.getByLabelText(/email/i), 'alice@example.com')
     await user.type(screen.getByLabelText(/password/i), 'whatever')
     await user.click(screen.getByRole('button', { name: /create account/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/taken/i)
+  })
+
+  it('requires an email of at most 254 characters', () => {
+    renderApp('/register')
+    const email = screen.getByLabelText(/email/i)
+    expect(email).toBeRequired()
+    expect(email).toHaveAttribute('type', 'email')
+    expect(email).toHaveAttribute('maxLength', '254')
+  })
+
+  it('shows an email the API rejects next to the email field', async () => {
+    const { user } = renderApp('/register')
+    await user.type(screen.getByLabelText(/username/i), 'carol')
+    // The browser accepts this, but the API wants a domain with a dot.
+    await user.type(screen.getByLabelText(/email/i), 'carol@example')
+    await user.type(screen.getByLabelText(/password/i), 'carol-password')
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    const email = screen.getByLabelText(/email/i)
+    await waitFor(() => expect(email).toHaveAttribute('aria-invalid', 'true'))
+    expect(email).toHaveAccessibleDescription('Enter a valid email address.')
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(findUser('carol')).toBeUndefined()
   })
 })
 
