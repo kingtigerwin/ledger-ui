@@ -29,7 +29,7 @@ let nextId = 1
 export function seedUser(
   username: string,
   password: string,
-  fields: Partial<Pick<AdminUser, 'role' | 'status'>> = {},
+  fields: Partial<Pick<AdminUser, 'role' | 'status' | 'email'>> = {},
 ): MockUser {
   const user: MockUser = {
     id: `user-${nextId++}`,
@@ -38,6 +38,7 @@ export function seedUser(
     role: fields.role ?? 'customer',
     status: fields.status ?? 'pending',
     createdAt: '2026-10-27T01:00:00.000Z',
+    ...(fields.email && { email: fields.email }),
   }
   db.users.set(user.id, user)
   return user
@@ -49,8 +50,11 @@ export function resetMockDb() {
   db.tokenGeneration = 0
   db.transactions = []
   seedUser('sisi', 'sisi-password', { role: 'admin', status: 'active' })
-  seedUser('alice', 'alice-password', { status: 'active' })
-  seedUser('bob', 'bob-password')
+  seedUser('alice', 'alice-password', {
+    status: 'active',
+    email: 'alice@example.com',
+  })
+  seedUser('bob', 'bob-password', { email: 'bob@example.com' })
 }
 
 /** Records an expense for `username`, as if they had told the agent about it. */
@@ -195,14 +199,32 @@ function chat(user: MockUser, { messages }: ChatRequest): ChatResponse {
 
 export const handlers = [
   http.post('*/api/v1/auth/register', async ({ request }) => {
-    const { username, password } = (await request.json()) as {
+    const { username, password, email } = (await request.json()) as {
       username: string
       password: string
+      email?: string
+    }
+    // Like ledger-api's zod check: an address with a dotted domain, at most 254 characters.
+    if (
+      typeof email !== 'string' ||
+      email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    ) {
+      return HttpResponse.json(
+        {
+          error: {
+            code: 'validation_failed',
+            message: 'Request body is invalid',
+            details: [{ path: ['email'], message: 'Invalid email address' }],
+          },
+        },
+        { status: 400 },
+      )
     }
     if (findUser(username.toLowerCase())) {
       return apiError(409, 'username_taken', 'That username is taken')
     }
-    const user = seedUser(username.toLowerCase(), password)
+    const user = seedUser(username.toLowerCase(), password, { email })
     return HttpResponse.json(publicUser(user), { status: 201 })
   }),
 

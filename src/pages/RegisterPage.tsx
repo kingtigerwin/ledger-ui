@@ -8,21 +8,34 @@ import {
   TextField,
 } from '../components/AuthCard'
 
+/** ledger-api rejects a missing, malformed or over-long email with 400 `validation_failed`. */
+const isEmailRejected = (err: unknown) =>
+  err instanceof ApiError &&
+  err.code === 'validation_failed' &&
+  !!err.details?.some((issue) => issue.path[0] === 'email')
+
 export function RegisterPage() {
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [registered, setRegistered] = useState(false)
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
+    setEmailError(null)
     setSubmitting(true)
     try {
-      await register(username.trim(), password)
+      await register(username.trim(), password, email.trim())
       setRegistered(true)
     } catch (err) {
+      if (isEmailRejected(err)) {
+        setEmailError('Enter a valid email address.')
+        return
+      }
       setError(
         err instanceof ApiError
           ? err.message
@@ -37,8 +50,7 @@ export function RegisterPage() {
     return (
       <AuthCard title="Account created">
         <p role="status" className="text-center text-slate-600">
-          Your account is pending. An admin needs to approve it before you can
-          sign in.
+          Check your email: your account is waiting for approval.
         </p>
         <Link
           to="/login"
@@ -63,6 +75,15 @@ export function RegisterPage() {
           onChange={setUsername}
           autoComplete="username"
           autoFocus
+        />
+        <TextField
+          label="Email"
+          name="email"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          autoComplete="email"
+          error={emailError}
         />
         <TextField
           label="Password"
