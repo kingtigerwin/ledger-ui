@@ -78,14 +78,7 @@ describe('given the waiting page', () => {
     expect(screen.queryByLabelText(/describe your spending/i)).toBeNull()
   })
 
-  it('leads a Google user back through Google', async () => {
-    renderApp('/pending?via=google')
-    expect(
-      await screen.findByRole('link', { name: /continue with google/i }),
-    ).toHaveAttribute('href', '/api/v1/auth/google/start')
-  })
-
-  it("doesn't offer Google to a password user, who'd get a second account", async () => {
+  it('offers only sign in: Google would give a password user a second account', async () => {
     renderApp('/pending')
     expect(
       await screen.findByRole('link', { name: /back to sign in/i }),

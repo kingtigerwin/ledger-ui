@@ -14,9 +14,10 @@ function createMessage(
   return { id: crypto.randomUUID(), createdAt: Date.now(), ...fields }
 }
 
-/** Retrying can't help until the limit resets, so this failure gets no Retry button. */
+/** Retrying can't help until the limits reset, so these failures get no Retry button. */
+const DAILY_LIMITS = ['daily_limit_reached', 'daily_total_reached']
 const canRetry = (error: Error) =>
-  !(error instanceof ApiError && error.code === 'daily_limit_reached')
+  !(error instanceof ApiError && DAILY_LIMITS.includes(error.code))
 
 /** The agent keeps no conversation state, so every turn sends the history (text only, no errors). */
 function toHistory(messages: ChatMessage[]): ChatTurn[] {
