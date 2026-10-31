@@ -126,14 +126,16 @@ describe('given alice on the chat page', () => {
     expect(screen.getByText(/5 messages a day/i)).toBeInTheDocument()
   })
 
-  it("explains the daily limit once it's reached, with nothing to retry", async () => {
-    const limit = "You've used today's 5 messages."
+  it.each([
+    ['daily_limit_reached', "You've used today's 5 messages."],
+    ['daily_total_reached', 'The chat is very busy today.'],
+  ])('explains %s, with nothing to retry', async (code, limit) => {
     server.use(
       http.post(
         '*/agent/v1/chat',
         () =>
           HttpResponse.json(
-            { error: { code: 'daily_limit_reached', message: limit } },
+            { error: { code, message: limit } },
             { status: 429 },
           ),
         { once: true },

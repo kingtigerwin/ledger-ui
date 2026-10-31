@@ -4,8 +4,8 @@ The web UI for [ledger-api](https://github.com/kingtigerwin/ledger-api) and [led
 
 - **Sign in** (`/login`): username and password. Active users go to the chat; pending users go to the waiting page.
 - **Register** (`/register`, linked from sign in): creates a `pending` account.
-- **Waiting** (`/pending`): where pending users land, from either sign-in. It has no chat, and they hold no token.
-- **Chat** (`/chat`, signed-in only): describe spending in plain words; ledger-agent records it or answers questions about it. Each person gets 5 messages a day, which ledger-agent enforces.
+- **Waiting** (`/pending`): where pending users land. Only password sign-ups wait for approval; Google users go straight to the chat. It has no chat, and they hold no token.
+- **Chat** (`/chat`, signed-in only): describe spending in plain words; ledger-agent records it or answers questions about it. Each person gets 5 messages a day and everyone together 300, which ledger-agent enforces.
 - **Users** (`/admin`, admins such as `sisi` only): pending, active and disabled users. Approve enables a user (they can then sign in); Reject disables them (they can't).
 
 ## How it fits together
