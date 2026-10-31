@@ -11,12 +11,18 @@ const TABS: { status: UserStatus; label: string }[] = [
   { status: 'disabled', label: 'Disabled' },
 ]
 
-type Action = 'enable' | 'disable'
+type Action = 'enable' | 'disable' | 'delete'
 
 interface ActionButton {
   action: Action
   label: string
-  style: 'primary' | 'secondary'
+  style: 'primary' | 'secondary' | 'danger'
+}
+
+const DELETE_BUTTON: ActionButton = {
+  action: 'delete',
+  label: 'Delete',
+  style: 'danger',
 }
 
 // Rejecting a pending user disables them, so they can't sign in; an admin can still enable them later.
@@ -24,15 +30,28 @@ const ACTIONS: Record<UserStatus, ActionButton[]> = {
   pending: [
     { action: 'enable', label: 'Approve', style: 'primary' },
     { action: 'disable', label: 'Reject', style: 'secondary' },
+    DELETE_BUTTON,
   ],
-  active: [{ action: 'disable', label: 'Disable', style: 'secondary' }],
-  disabled: [{ action: 'enable', label: 'Enable', style: 'primary' }],
+  active: [
+    { action: 'disable', label: 'Disable', style: 'secondary' },
+    DELETE_BUTTON,
+  ],
+  disabled: [
+    { action: 'enable', label: 'Enable', style: 'primary' },
+    DELETE_BUTTON,
+  ],
 }
 
 const BUTTON_STYLES: Record<ActionButton['style'], string> = {
   primary: 'bg-indigo-600 text-white hover:bg-indigo-700',
   secondary: 'border border-slate-300 text-slate-700 hover:bg-slate-50',
+  danger: 'border border-red-300 text-red-700 hover:bg-red-50',
 }
+
+const confirmDelete = (user: AdminUser) =>
+  window.confirm(
+    `Delete ${user.username} and all their transactions? This can't be undone.`,
+  )
 
 export function AdminPage() {
   const { authRequest } = useAuth()
@@ -49,9 +68,13 @@ export function AdminPage() {
 
   const mutation = useMutation({
     mutationFn: ({ user, action }: { user: AdminUser; action: Action }) =>
-      authRequest<void>(`/api/v1/admin/users/${user.id}/${action}`, {
-        method: 'POST',
-      }),
+      action === 'delete'
+        ? authRequest<void>(`/api/v1/admin/users/${user.id}`, {
+            method: 'DELETE',
+          })
+        : authRequest<void>(`/api/v1/admin/users/${user.id}/${action}`, {
+            method: 'POST',
+          }),
     // A user moves between tabs, so every list may have changed.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   })
@@ -125,14 +148,19 @@ export function AdminPage() {
                       Registered {formatDate(user.createdAt.slice(0, 10))}
                     </div>
                   </div>
-                  {/* ledger-api refuses to disable admins, so they get no buttons. */}
+                  {/* ledger-api refuses to disable or delete admins, so they get no buttons. */}
                   {user.role !== 'admin' && (
                     <div className="flex gap-2">
                       {ACTIONS[status].map(({ action, label, style }) => (
                         <button
                           key={action}
                           type="button"
-                          onClick={() => mutation.mutate({ user, action })}
+                          onClick={() => {
+                            if (action === 'delete' && !confirmDelete(user)) {
+                              return
+                            }
+                            mutation.mutate({ user, action })
+                          }}
                           disabled={mutation.isPending}
                           aria-label={`${label} ${user.username}`}
                           className={`rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${BUTTON_STYLES[style]}`}
