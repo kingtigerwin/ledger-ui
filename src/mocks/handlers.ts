@@ -79,13 +79,20 @@ const newTransaction = (
 
 const withoutOwner = ({ userId: _userId, ...t }: MockTransaction) => t
 
-/** Makes every access token issued so far fail with 401, as if 15 minutes had passed. */
+/** Makes every access token issued so far be refused, as if 15 minutes had passed. */
 export function expireAccessTokens() {
   db.tokenGeneration++
 }
 
 /** Ends the refresh-cookie session, as if it had expired or been revoked. */
 export function endSession() {
+  db.sessionUserId = null
+}
+
+/** As if sisi deleted them elsewhere: their token and refresh cookie stop working. */
+export function deleteUserFromAnotherSession(username: string) {
+  const user = findUser(username)
+  if (user) db.users.delete(user.id)
   db.sessionUserId = null
 }
 
@@ -124,8 +131,12 @@ const withUser =
   ): Resolver =>
   (info) => {
     const user = caller(info.request)
-    if (!user) return apiError(401, 'unauthorized', 'Sign in first')
-    return handler(user, info)
+    if (user) return handler(user, info)
+    // As API Gateway answers: 401 with no token, and 403 when the authorizer refuses one, which
+    // is what an expired token gets. It's API Gateway's own shape, not ledger-api's.
+    return info.request.headers.has('authorization')
+      ? HttpResponse.json({ message: 'Forbidden' }, { status: 403 })
+      : HttpResponse.json({ message: 'Unauthorized' }, { status: 401 })
   }
 
 const withAdmin = (handler: (info: ResolverInfo) => ReturnType<Resolver>) =>
@@ -288,6 +299,19 @@ export const handlers = [
   http.post(
     '*/api/v1/admin/users/:id/disable',
     withAdmin(({ params }) => setStatus(String(params.id), 'disabled')),
+  ),
+
+  http.delete(
+    '*/api/v1/admin/users/:id',
+    withAdmin(({ params }) => {
+      const user = db.users.get(String(params.id))
+      if (!user) return apiError(404, 'user_not_found', 'No such user')
+      if (user.role === 'admin') {
+        return apiError(409, 'cannot_delete_admin', "Admins can't be deleted")
+      }
+      db.users.delete(user.id)
+      return new HttpResponse(null, { status: 204 })
+    }),
   ),
 
   http.post(

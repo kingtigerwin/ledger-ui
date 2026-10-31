@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { findUser } from '../mocks/handlers'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { deleteUserFromAnotherSession, findUser } from '../mocks/handlers'
 import { renderApp, signIn } from '../test/renderApp'
 
 async function openUsersAsSisi() {
@@ -20,6 +20,66 @@ async function signOutAndSignInAs(
 }
 
 describe('given sisi on the Users page', () => {
+  describe('deleting a user', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('warns that it cannot be undone, then removes them', async () => {
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+      const { user } = await openUsersAsSisi()
+      await user.click(
+        await screen.findByRole('button', { name: 'Delete bob' }),
+      )
+      expect(confirm).toHaveBeenCalledWith(
+        expect.stringMatching(/bob.*transactions.*can't be undone/i),
+      )
+      expect(await screen.findByText(/no pending users/i)).toBeInTheDocument()
+      expect(findUser('bob')).toBeUndefined()
+    })
+
+    it('keeps them if sisi changes their mind', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false)
+      const { user } = await openUsersAsSisi()
+      await user.click(
+        await screen.findByRole('button', { name: 'Delete bob' }),
+      )
+      expect(findUser('bob')).toBeDefined()
+      expect(screen.getByText('bob')).toBeInTheDocument()
+    })
+
+    it('offers it on the active and disabled tabs too', async () => {
+      const { user } = await openUsersAsSisi()
+      await user.click(screen.getByRole('tab', { name: /active/i }))
+      expect(
+        await screen.findByRole('button', { name: 'Delete alice' }),
+      ).toBeInTheDocument()
+    })
+
+    it('signs a deleted user out on their next request', async () => {
+      const { user } = renderApp('/login')
+      await signIn(user, 'alice', 'alice-password')
+      await screen.findByLabelText(/describe your spending/i)
+      deleteUserFromAnotherSession('alice')
+
+      await user.type(
+        screen.getByLabelText(/describe your spending/i),
+        'spent $5{Enter}',
+      )
+
+      expect(
+        await screen.findByRole('heading', { name: /sign in/i }),
+      ).toBeInTheDocument()
+    })
+
+    it('never offers it for sisi', async () => {
+      const { user } = await openUsersAsSisi()
+      await user.click(screen.getByRole('tab', { name: /active/i }))
+      await screen.findByRole('list', { name: /active users/i })
+      expect(screen.queryByRole('button', { name: 'Delete sisi' })).toBeNull()
+    })
+  })
+
   it('lists the pending users', async () => {
     await openUsersAsSisi()
     const list = await screen.findByRole('list', { name: /pending users/i })

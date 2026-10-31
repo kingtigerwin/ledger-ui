@@ -5,6 +5,15 @@ import * as api from '../api/client'
 import { ApiError } from '../api/client'
 import { AuthContext, type AuthContextValue, type AuthState } from './context'
 
+/**
+ * API Gateway answers 403 when the authorizer refuses a token, whether it has expired or its
+ * user was disabled or deleted, and with its own body, so there's no ledger-api error code.
+ * A 403 from ledger-api itself (`forbidden`) means the token is fine and the answer is no.
+ */
+const isTokenRefused = (err: unknown) =>
+  err instanceof ApiError &&
+  (err.status === 401 || (err.status === 403 && err.code === 'http_error'))
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' })
   // The access token lives only in memory; a reload gets a new one from the HttpOnly refresh cookie.
@@ -47,9 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           token: tokenRef.current ?? undefined,
         })
       } catch (err) {
-        if (!(err instanceof ApiError) || err.status !== 401) throw err
+        if (!isTokenRefused(err)) throw err
       }
-      // The access token lasts 15 minutes; get another and try once more.
+      // The access token lasts 15 minutes; get another and try once more. If the user was
+      // disabled or deleted, refreshing fails too and signs them out.
       let accessToken: string
       try {
         ;({ accessToken } = await api.refresh())
