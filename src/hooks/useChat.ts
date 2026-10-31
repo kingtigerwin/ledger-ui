@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
+import { ApiError } from '../api/client'
 import type { ChatResponse, ChatTurn } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import type { ChatMessage } from '../types'
@@ -12,6 +13,10 @@ function createMessage(
 ): ChatMessage {
   return { id: crypto.randomUUID(), createdAt: Date.now(), ...fields }
 }
+
+/** Retrying can't help until the limit resets, so this failure gets no Retry button. */
+const canRetry = (error: Error) =>
+  !(error instanceof ApiError && error.code === 'daily_limit_reached')
 
 /** The agent keeps no conversation state, so every turn sends the history (text only, no errors). */
 function toHistory(messages: ChatMessage[]): ChatTurn[] {
@@ -58,7 +63,7 @@ export function useChat() {
             role: 'assistant',
             text: error.message,
             isError: true,
-            retryOf: userMessageId,
+            retryOf: canRetry(error) ? userMessageId : undefined,
           }),
         ]),
     })

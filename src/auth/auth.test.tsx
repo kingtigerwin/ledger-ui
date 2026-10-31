@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { endSession, findUser } from '../mocks/handlers'
 import { renderApp, signIn } from '../test/renderApp'
@@ -36,12 +36,13 @@ describe('given a visitor who is not signed in', () => {
     )
   })
 
-  it('tells a pending user they are waiting for approval', async () => {
+  it('sends a pending user to the waiting page, with no chat', async () => {
     const { user } = renderApp('/login')
     await signIn(user, 'bob', 'bob-password')
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      /waiting for admin approval/i,
-    )
+    expect(
+      await screen.findByRole('heading', { name: /nearly in/i }),
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText(/describe your spending/i)).toBeNull()
   })
 })
 
@@ -54,7 +55,6 @@ describe('given the login page', () => {
   })
 
   it.each([
-    ['account_pending', /waiting for admin approval/i],
     ['google_failed', /google sign-in didn't work/i],
     ['google_unavailable', /isn't available/i],
   ])('explains the error %s from Google sign-in', async (code, message) => {
@@ -66,6 +66,42 @@ describe('given the login page', () => {
     renderApp('/login?error=<script>')
     await screen.findByRole('heading', { name: /sign in/i })
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+describe('given the waiting page', () => {
+  it('says the account is waiting and an email will follow', async () => {
+    renderApp('/pending')
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /waiting for approval.*email you/i,
+    )
+    expect(screen.queryByLabelText(/describe your spending/i)).toBeNull()
+  })
+
+  it('leads a Google user back through Google', async () => {
+    renderApp('/pending?via=google')
+    expect(
+      await screen.findByRole('link', { name: /continue with google/i }),
+    ).toHaveAttribute('href', '/api/v1/auth/google/start')
+  })
+
+  it("doesn't offer Google to a password user, who'd get a second account", async () => {
+    renderApp('/pending')
+    expect(
+      await screen.findByRole('link', { name: /back to sign in/i }),
+    ).toHaveAttribute('href', '/login')
+    expect(screen.queryByRole('link', { name: /google/i })).toBeNull()
+  })
+
+  it('sends someone already signed in to the chat', async () => {
+    const { user } = renderApp('/login')
+    await signIn(user, 'alice', 'alice-password')
+    await screen.findByLabelText(/describe your spending/i)
+    cleanup()
+    renderApp('/pending')
+    expect(
+      await screen.findByLabelText(/describe your spending/i),
+    ).toBeInTheDocument()
   })
 })
 
@@ -91,9 +127,9 @@ describe('given the register page', () => {
 
     await user.click(screen.getByRole('link', { name: /back to sign in/i }))
     await signIn(user, 'carol', 'carol-password')
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      /waiting for admin approval/i,
-    )
+    expect(
+      await screen.findByRole('heading', { name: /nearly in/i }),
+    ).toBeInTheDocument()
   })
 
   it('reports a taken username', async () => {

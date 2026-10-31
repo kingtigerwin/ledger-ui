@@ -118,6 +118,34 @@ describe('given alice on the chat page', () => {
     expect(screen.getAllByText('Spent $6 on coffee')).toHaveLength(1)
   })
 
+  it('tells them about the daily limit, before and during a chat', async () => {
+    const { user, input } = await openChat()
+    expect(screen.getByText(/5 messages a day/i)).toBeInTheDocument()
+    await user.type(input, 'Spent $6 on coffee{Enter}')
+    await screen.findByText('Recorded $6.00.')
+    expect(screen.getByText(/5 messages a day/i)).toBeInTheDocument()
+  })
+
+  it("explains the daily limit once it's reached, with nothing to retry", async () => {
+    const limit = "You've used today's 5 messages."
+    server.use(
+      http.post(
+        '*/agent/v1/chat',
+        () =>
+          HttpResponse.json(
+            { error: { code: 'daily_limit_reached', message: limit } },
+            { status: 429 },
+          ),
+        { once: true },
+      ),
+    )
+    const { user, input } = await openChat()
+    await user.type(input, 'Spent $6 on coffee{Enter}')
+
+    expect(await screen.findByText(limit)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull()
+  })
+
   it('fills the input when an example prompt is clicked', async () => {
     const { user, input } = await openChat()
     await user.click(screen.getByRole('button', { name: EXAMPLE_PROMPTS[0] }))
