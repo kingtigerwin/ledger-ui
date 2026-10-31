@@ -45,6 +45,30 @@ describe('given a visitor who is not signed in', () => {
   })
 })
 
+describe('given the login page', () => {
+  it('links to Google sign-in, which the server runs', async () => {
+    renderApp('/login')
+    expect(
+      await screen.findByRole('link', { name: /continue with google/i }),
+    ).toHaveAttribute('href', '/api/v1/auth/google/start')
+  })
+
+  it.each([
+    ['account_pending', /waiting for admin approval/i],
+    ['google_failed', /google sign-in didn't work/i],
+    ['google_unavailable', /isn't available/i],
+  ])('explains the error %s from Google sign-in', async (code, message) => {
+    renderApp(`/login?error=${code}`)
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+  })
+
+  it('ignores an error it does not know', async () => {
+    renderApp('/login?error=<script>')
+    await screen.findByRole('heading', { name: /sign in/i })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
 describe('given the register page', () => {
   it('is linked from the login page', async () => {
     const { user } = renderApp('/login')
