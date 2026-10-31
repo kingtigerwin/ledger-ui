@@ -16,13 +16,9 @@ import {
   TextField,
 } from '../components/AuthCard'
 
-const PENDING_MESSAGE =
-  'Your account is waiting for admin approval. Try again once it has been approved.'
-
 // Google sign-in ends with a redirect back here, so its outcome arrives in the URL. Only these
 // codes show anything: the URL is anyone's to write, so its text is never displayed.
 const REDIRECT_ERRORS: Record<string, string> = {
-  account_pending: PENDING_MESSAGE,
   google_failed:
     "Google sign-in didn't work. Please try again, or use your username and password.",
   google_unavailable: "Google sign-in isn't available right now.",
@@ -31,7 +27,6 @@ const REDIRECT_ERRORS: Record<string, string> = {
 function loginErrorMessage(err: unknown): string {
   if (!(err instanceof ApiError))
     return 'Something went wrong. Please try again.'
-  if (err.code === 'account_pending') return PENDING_MESSAGE
   return err.message
 }
 
@@ -58,6 +53,10 @@ export function LoginPage() {
       await login(username.trim(), password)
       navigate(from, { replace: true })
     } catch (err) {
+      if (err instanceof ApiError && err.code === 'account_pending') {
+        navigate('/pending', { replace: true })
+        return
+      }
       setError(loginErrorMessage(err))
       setSubmitting(false)
     }

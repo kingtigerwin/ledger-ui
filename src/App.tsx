@@ -3,6 +3,7 @@ import { RequireAuth } from './auth/RequireAuth'
 import { AdminPage } from './pages/AdminPage'
 import { ChatPage } from './pages/ChatPage'
 import { LoginPage } from './pages/LoginPage'
+import { PendingPage } from './pages/PendingPage'
 import { RegisterPage } from './pages/RegisterPage'
 
 export default function App() {
@@ -10,6 +11,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/pending" element={<PendingPage />} />
       <Route
         path="/chat"
         element={

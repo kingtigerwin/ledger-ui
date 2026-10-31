@@ -1,4 +1,5 @@
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from 'react'
+import { DAILY_MESSAGE_LIMIT } from '../constants'
 
 interface ChatInputProps {
   value: string
@@ -74,6 +75,10 @@ export function ChatInput({
           </button>
         </div>
       </div>
+      <p className="mt-2 text-center text-xs text-slate-500">
+        Each person can send {DAILY_MESSAGE_LIMIT} messages a day. This resets
+        at midnight Sydney time.
+      </p>
     </form>
   )
 }

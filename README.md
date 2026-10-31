@@ -2,9 +2,10 @@
 
 The web UI for [ledger-api](https://github.com/kingtigerwin/ledger-api) and [ledger-agent](https://github.com/kingtigerwin/ledger-agent): React 19, React Router, React Context for auth, TanStack Query, Tailwind. Served at `https://ledger.haoran.cloud` from S3 behind CloudFront, deployed by GitHub Actions with AWS CDK.
 
-- **Sign in** (`/login`): username and password. Active users go to the chat; pending users are told they're waiting for approval.
+- **Sign in** (`/login`): username and password. Active users go to the chat; pending users go to the waiting page.
 - **Register** (`/register`, linked from sign in): creates a `pending` account.
-- **Chat** (`/chat`, signed-in only): describe spending in plain words; ledger-agent records it or answers questions about it.
+- **Waiting** (`/pending`): where pending users land, from either sign-in. It has no chat, and they hold no token.
+- **Chat** (`/chat`, signed-in only): describe spending in plain words; ledger-agent records it or answers questions about it. Each person gets 50 messages a day, which ledger-agent enforces.
 - **Users** (`/admin`, admins such as `sisi` only): pending, active and disabled users. Approve enables a user (they can then sign in); Reject disables them (they can't).
 
 ## How it fits together
