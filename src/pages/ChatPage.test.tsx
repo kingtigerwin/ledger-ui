@@ -120,14 +120,14 @@ describe('given alice on the chat page', () => {
 
   it('tells them about the daily limit, before and during a chat', async () => {
     const { user, input } = await openChat()
-    expect(screen.getByText(/50 messages a day/i)).toBeInTheDocument()
+    expect(screen.getByText(/5 messages a day/i)).toBeInTheDocument()
     await user.type(input, 'Spent $6 on coffee{Enter}')
     await screen.findByText('Recorded $6.00.')
-    expect(screen.getByText(/50 messages a day/i)).toBeInTheDocument()
+    expect(screen.getByText(/5 messages a day/i)).toBeInTheDocument()
   })
 
   it("explains the daily limit once it's reached, with nothing to retry", async () => {
-    const limit = "You've used today's 50 messages."
+    const limit = "You've used today's 5 messages."
     server.use(
       http.post(
         '*/agent/v1/chat',
