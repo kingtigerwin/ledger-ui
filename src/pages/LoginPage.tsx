@@ -1,20 +1,37 @@
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router'
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/useAuth'
 import {
   AuthCard,
   FormError,
+  GoogleLink,
   primaryButtonClass,
   TextField,
 } from '../components/AuthCard'
 
+const PENDING_MESSAGE =
+  'Your account is waiting for admin approval. Try again once it has been approved.'
+
+// Google sign-in ends with a redirect back here, so its outcome arrives in the URL. Only these
+// codes show anything: the URL is anyone's to write, so its text is never displayed.
+const REDIRECT_ERRORS: Record<string, string> = {
+  account_pending: PENDING_MESSAGE,
+  google_failed:
+    "Google sign-in didn't work. Please try again, or use your username and password.",
+  google_unavailable: "Google sign-in isn't available right now.",
+}
+
 function loginErrorMessage(err: unknown): string {
   if (!(err instanceof ApiError))
     return 'Something went wrong. Please try again.'
-  if (err.code === 'account_pending') {
-    return 'Your account is waiting for admin approval. Try again once it has been approved.'
-  }
+  if (err.code === 'account_pending') return PENDING_MESSAGE
   return err.message
 }
 
@@ -22,9 +39,12 @@ export function LoginPage() {
   const { state, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    () => REDIRECT_ERRORS[searchParams.get('error') ?? ''] ?? null,
+  )
   const [submitting, setSubmitting] = useState(false)
 
   const from = (location.state as { from?: string } | null)?.from ?? '/chat'
@@ -71,6 +91,12 @@ export function LoginPage() {
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
+      <div className="my-4 flex items-center gap-3 text-sm text-slate-400">
+        <span className="h-px flex-1 bg-slate-200" />
+        or
+        <span className="h-px flex-1 bg-slate-200" />
+      </div>
+      <GoogleLink />
       <p className="mt-6 text-center text-sm text-slate-500">
         No account yet?{' '}
         <Link
