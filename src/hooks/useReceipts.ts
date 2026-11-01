@@ -184,7 +184,13 @@ export function useReceipts() {
     }
   }
 
+  const cancelEdit = () => {
+    if (stage.name === 'editing') {
+      setStage({ name: 'recorded', transaction: stage.transaction })
+    }
+  }
+
   const close = () => setStage({ name: 'idle' })
 
-  return { stage, scan, saveReview, saveEdit, undo, edit, close }
+  return { stage, scan, saveReview, saveEdit, undo, edit, cancelEdit, close }
 }

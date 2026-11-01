@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { readReply } from './receipts'
 import type {
   AdminUser,
@@ -435,7 +435,10 @@ export const handlers = [
 
   http.post(
     '*/agent/v1/receipts/read',
-    withUser(() => HttpResponse.json(db.receiptReply)),
+    withUser(async () => {
+      await delay()
+      return HttpResponse.json(db.receiptReply)
+    }),
   ),
 
   http.delete(

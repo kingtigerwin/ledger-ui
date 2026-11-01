@@ -4,7 +4,9 @@ import { CATEGORIES } from '../constants'
 import { formatCents } from '../format'
 import { useReceipts } from '../hooks/useReceipts'
 import type { ReceiptEntry } from '../receipts/toTransaction'
+import { ReceiptItems } from './ReceiptItems'
 import { TransactionCard } from './TransactionCard'
+import { WaitingModal } from './WaitingModal'
 
 const PROBLEMS: Partial<Record<ReceiptProblem, string>> = {
   merchant_unreadable: "The merchant couldn't be read.",
@@ -157,6 +159,7 @@ function Recorded({
         ))}
       </div>
       <TransactionCard title="Recorded" transactions={[transaction]} />
+      <ReceiptItems transaction={transaction} />
       <div className="mt-2 flex justify-end gap-2">
         <button type="button" onClick={onEdit} className={quietButtonClass}>
           Edit
@@ -170,7 +173,8 @@ function Recorded({
 }
 
 export function ReceiptScanner() {
-  const { stage, scan, saveReview, saveEdit, undo, edit, close } = useReceipts()
+  const { stage, scan, saveReview, saveEdit, undo, edit, cancelEdit, close } =
+    useReceipts()
   const busy = stage.name === 'reading'
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -210,7 +214,7 @@ export function ReceiptScanner() {
       </div>
 
       {stage.name === 'reading' && (
-        <p className="text-sm text-slate-500">Reading your receipt…</p>
+        <WaitingModal message="Your receipt is uploading, please wait…" />
       )}
       {stage.name === 'failed' && (
         <p role="alert" className="text-sm text-red-700">
@@ -244,7 +248,7 @@ export function ReceiptScanner() {
           }}
           warnings={stage.saveError ? [stage.saveError] : []}
           onSave={saveEdit}
-          onCancel={close}
+          onCancel={cancelEdit}
         />
       )}
     </section>

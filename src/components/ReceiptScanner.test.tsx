@@ -296,7 +296,7 @@ describe('given saving fails', () => {
 })
 
 describe('given a scan is running', () => {
-  it('shows it and blocks another', async () => {
+  function holdTheReply() {
     let finish = () => {}
     server.use(
       http.post('*/agent/v1/receipts/read', async () => {
@@ -304,14 +304,116 @@ describe('given a scan is running', () => {
         return HttpResponse.json(readReply())
       }),
     )
+    return () => finish()
+  }
+
+  it('shows a modal that says to wait, until it finishes', async () => {
+    const finish = holdTheReply()
     const { user } = await openHome()
 
     await user.upload(screen.getByLabelText('Upload photo'), photo)
 
-    expect(await screen.findByText(/reading your receipt/i)).toBeVisible()
-    expect(screen.getByLabelText('Upload photo')).toBeDisabled()
+    const modal = await screen.findByRole('dialog', { hidden: true })
+    expect(modal).toHaveTextContent('Your receipt is uploading, please wait')
+    expect(modal).toHaveAttribute('open')
+    expect(screen.getByTestId('spinner')).toBeInTheDocument()
     await waitFor(() => finish())
     expect(await screen.findByRole('status')).toBeInTheDocument()
-    expect(within(document.body).queryByText(/reading your/i)).toBeNull()
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull()
+  })
+
+  it('blocks another scan', async () => {
+    const finish = holdTheReply()
+    const { user } = await openHome()
+
+    await user.upload(screen.getByLabelText('Upload photo'), photo)
+
+    await screen.findByRole('dialog', { hidden: true })
+    expect(screen.getByLabelText('Upload photo')).toBeDisabled()
+    expect(screen.getByLabelText('Take photo')).toBeDisabled()
+    await waitFor(() => finish())
+    await screen.findByRole('status')
+  })
+
+  it('cannot be closed with Escape', async () => {
+    const finish = holdTheReply()
+    const { user } = await openHome()
+    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    const modal = await screen.findByRole('dialog', { hidden: true })
+
+    const escape = new Event('cancel', { cancelable: true })
+    modal.dispatchEvent(escape)
+
+    expect(escape.defaultPrevented).toBe(true)
+    await waitFor(() => finish())
+    await screen.findByRole('status')
+  })
+
+  it('goes away when the read fails', async () => {
+    server.use(
+      http.post('*/agent/v1/receipts/read', () =>
+        HttpResponse.json(
+          { error: { code: 'unreadable', message: 'Try a clearer photo' } },
+          { status: 422 },
+        ),
+      ),
+    )
+    const { user } = await openHome()
+
+    await user.upload(screen.getByLabelText('Upload photo'), photo)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('clearer photo')
+    expect(screen.queryByRole('dialog', { hidden: true })).toBeNull()
+  })
+})
+
+describe('given a recorded receipt', () => {
+  it('lists every item with its price', async () => {
+    await scan()
+    await screen.findByRole('status')
+
+    const items = screen.getByRole('list', { name: 'Receipt items' })
+    expect(
+      within(items)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent),
+    ).toEqual([
+      'PI PERFECT BAKES 450$8.50',
+      'COLES BEEF MINCE 4ST$15.50',
+      'CLS CHICKEN MINCE$6.50',
+    ])
+  })
+
+  it('shows the receipt total, savings and where it was', async () => {
+    await scan()
+    await screen.findByRole('status')
+
+    expect(screen.getByTestId('receipt-total')).toHaveTextContent('$30.50')
+    expect(screen.getByTestId('receipt-savings')).toHaveTextContent('$31.00')
+    expect(screen.getByText('The Glen · 15:06')).toBeInTheDocument()
+  })
+
+  it('shows GST only when some was charged', async () => {
+    await scan()
+    await screen.findByRole('status')
+    expect(screen.queryByText(/gst/i)).toBeNull()
+  })
+
+  it('shows GST when the receipt has it', async () => {
+    await scan(readReply({ receipt: { ...flybuysReceipt, gstCents: 355 } }))
+    await screen.findByRole('status')
+
+    expect(screen.getByTestId('receipt-gst')).toHaveTextContent('$3.55')
+  })
+
+  it('comes back after Cancel on Edit, so Undo is still there', async () => {
+    const { user } = await scan()
+    await screen.findByRole('status')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    expect(saved()).toHaveLength(1)
   })
 })
