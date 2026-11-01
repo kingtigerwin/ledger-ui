@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../auth/useAuth'
 import { AppHeader } from '../components/AppHeader'
 import { AskBox } from '../components/AskBox'
 import { InsightCard } from '../components/InsightCard'
@@ -88,6 +89,9 @@ export function HomePage() {
   const today = localDate(now)
   const insights = useInsights(today)
   const count = insights.data?.length ?? 0
+  const { state } = useAuth()
+  // The header leaves the username out on a phone, so this is where it shows there.
+  const name = state.status === 'signedIn' ? `, ${state.user.username}` : ''
 
   return (
     <div className="flex h-full flex-col">
@@ -97,6 +101,7 @@ export function HomePage() {
           <div>
             <h1 className="text-2xl font-semibold text-slate-800">
               {greeting(now)}
+              {name}
             </h1>
             <p className="text-slate-500">Your financial inbox</p>
           </div>

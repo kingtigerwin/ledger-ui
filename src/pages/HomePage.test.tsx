@@ -34,6 +34,15 @@ describe('given alice on the Home page', () => {
     expect(screen.queryByRole('link', { name: 'Users' })).toBeNull()
   })
 
+  it('greets her by name', async () => {
+    await openHome()
+    expect(
+      screen.getByRole('heading', {
+        name: /^good (morning|afternoon|evening), alice$/i,
+      }),
+    ).toBeInTheDocument()
+  })
+
   describe('this month’s spend', () => {
     it('shows the total, and the categories when opened', async () => {
       seedTransaction('alice', 12345)
