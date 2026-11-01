@@ -1,4 +1,4 @@
-import type { MonthlySummary, Transaction } from './api/types'
+import type { MonthlySummary, PurchaseSearch, Transaction } from './api/types'
 
 export type MessageRole = 'user' | 'assistant'
 
@@ -14,4 +14,5 @@ export interface ChatMessage {
   transactions?: Transaction[]
   listed?: Transaction[]
   summaries?: MonthlySummary[]
+  purchases?: PurchaseSearch[]
 }
