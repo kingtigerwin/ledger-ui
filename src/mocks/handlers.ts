@@ -3,6 +3,7 @@ import type {
   AdminUser,
   ChatRequest,
   ChatResponse,
+  Insight,
   Transaction,
   UserStatus,
 } from '../api/types'
@@ -22,6 +23,7 @@ const db = {
   sessionUserId: null as string | null,
   tokenGeneration: 0,
   transactions: [] as MockTransaction[],
+  insights: new Map<string, Insight[]>(),
 }
 
 let nextId = 1
@@ -49,6 +51,7 @@ export function resetMockDb() {
   db.sessionUserId = null
   db.tokenGeneration = 0
   db.transactions = []
+  db.insights.clear()
   seedUser('sisi', 'sisi-password', { role: 'admin', status: 'active' })
   seedUser('alice', 'alice-password', {
     status: 'active',
@@ -62,6 +65,28 @@ export function seedTransaction(username: string, amountCents: number) {
   const user = findUser(username)
   if (!user) throw new Error(`No mock user ${username}`)
   db.transactions.push(newTransaction(user.id, amountCents))
+}
+
+/** Gives `username` a card on the Home page; ledger-api's rules are tested there, not here. */
+export function seedInsight(username: string, insight: Insight) {
+  const user = findUser(username)
+  if (!user) throw new Error(`No mock user ${username}`)
+  db.insights.set(user.id, [...(db.insights.get(user.id) ?? []), insight])
+}
+
+/** Deleting one of a pair of duplicates leaves nothing to compare, so its card goes too. */
+function removeFromInsights(userId: string, transactionId: string) {
+  const insights = (db.insights.get(userId) ?? [])
+    .map((insight) => ({
+      ...insight,
+      transactions: insight.transactions.filter((t) => t.id !== transactionId),
+    }))
+    .filter(
+      (insight) =>
+        insight.type !== 'possible_duplicate' ||
+        insight.transactions.length > 1,
+    )
+  db.insights.set(userId, insights)
 }
 
 const newTransaction = (
@@ -145,6 +170,26 @@ const withAdmin = (handler: (info: ResolverInfo) => ReturnType<Resolver>) =>
       ? handler(info)
       : apiError(403, 'forbidden', 'Admins only'),
   )
+
+function monthlySummary(user: MockUser, month: string) {
+  const byCategory = new Map<string, number>()
+  for (const t of db.transactions) {
+    if (t.userId !== user.id) continue
+    byCategory.set(
+      t.category,
+      (byCategory.get(t.category) ?? 0) + t.amountCents,
+    )
+  }
+  return {
+    month,
+    currency: 'AUD',
+    totalCents: [...byCategory.values()].reduce((sum, n) => sum + n, 0),
+    byCategory: [...byCategory].map(([category, totalCents]) => ({
+      category,
+      totalCents,
+    })),
+  }
+}
 
 function setStatus(id: string, status: UserStatus) {
   const user = db.users.get(id)
@@ -310,6 +355,56 @@ export const handlers = [
         return apiError(409, 'cannot_delete_admin', "Admins can't be deleted")
       }
       db.users.delete(user.id)
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+
+  http.get(
+    '*/api/v1/transactions/summary',
+    withUser((user, { request }) =>
+      HttpResponse.json(
+        monthlySummary(
+          user,
+          new URL(request.url).searchParams.get('month') ?? '',
+        ),
+      ),
+    ),
+  ),
+
+  http.delete(
+    '*/api/v1/transactions/:id',
+    withUser((user, { params }) => {
+      const id = String(params.id)
+      const known =
+        db.transactions.some((t) => t.id === id && t.userId === user.id) ||
+        db.insights
+          .get(user.id)
+          ?.some((insight) => insight.transactions.some((t) => t.id === id))
+      if (!known) {
+        return apiError(404, 'transaction_not_found', 'No such transaction')
+      }
+      db.transactions = db.transactions.filter((t) => t.id !== id)
+      removeFromInsights(user.id, id)
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+
+  http.get(
+    '*/api/v1/insights',
+    withUser((user, { request }) => {
+      const today = new URL(request.url).searchParams.get('today')
+      if (!today) return apiError(400, 'validation_failed', 'Query is invalid')
+      return HttpResponse.json({ items: db.insights.get(user.id) ?? [] })
+    }),
+  ),
+
+  http.post(
+    '*/api/v1/insights/:id/dismiss',
+    withUser((user, { params }) => {
+      db.insights.set(
+        user.id,
+        (db.insights.get(user.id) ?? []).filter((i) => i.id !== params.id),
+      )
       return new HttpResponse(null, { status: 204 })
     }),
   ),

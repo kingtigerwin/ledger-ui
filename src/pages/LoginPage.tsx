@@ -42,7 +42,7 @@ export function LoginPage() {
   )
   const [submitting, setSubmitting] = useState(false)
 
-  const from = (location.state as { from?: string } | null)?.from ?? '/chat'
+  const from = (location.state as { from?: string } | null)?.from ?? '/'
   if (state.status === 'signedIn') return <Navigate to={from} replace />
 
   const handleSubmit = async (event: FormEvent) => {

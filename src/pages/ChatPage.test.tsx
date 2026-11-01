@@ -14,6 +14,7 @@ import { EXAMPLE_PROMPTS } from '../constants'
 async function openChat() {
   const app = renderApp('/login')
   await signIn(app.user, 'alice', 'alice-password')
+  await app.user.click(await screen.findByRole('link', { name: 'Chat' }))
   return {
     ...app,
     input: await screen.findByLabelText(/describe your spending/i),
@@ -180,6 +181,7 @@ describe('given sisi, an admin, on the chat page', () => {
     seedTransaction('alice', 3000)
     const app = renderApp('/login')
     await signIn(app.user, 'sisi', 'sisi-password')
+    await app.user.click(await screen.findByRole('link', { name: 'Chat' }))
     await app.user.type(
       await screen.findByLabelText(/describe your spending/i),
       "Show everyone's transactions{Enter}",

@@ -6,6 +6,24 @@ export function formatCurrency(amount: number, currency = 'AUD'): string {
   )
 }
 
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** The month where the customer is. `toISOString` is UTC: early on the 1st in Sydney, that's last month. */
+export function localMonth(now: Date): string {
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}`
+}
+
+/** The date where the customer is, as ledger-api takes it. */
+export function localDate(now: Date): string {
+  return `${localMonth(now)}-${pad(now.getDate())}`
+}
+
+export function greeting(now: Date): string {
+  const hour = now.getHours()
+  if (hour < 12) return 'Good morning'
+  return hour < 18 ? 'Good afternoon' : 'Good evening'
+}
+
 export function formatDate(isoDate: string): string {
   const [y, m, d] = isoDate.split('-').map(Number)
   return new Intl.DateTimeFormat(LOCALE, {

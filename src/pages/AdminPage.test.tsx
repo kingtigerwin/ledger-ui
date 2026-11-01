@@ -59,13 +59,10 @@ describe('given sisi on the Users page', () => {
     it('signs a deleted user out on their next request', async () => {
       const { user } = renderApp('/login')
       await signIn(user, 'alice', 'alice-password')
-      await screen.findByLabelText(/describe your spending/i)
+      await screen.findByLabelText(/ask ledger/i)
       deleteUserFromAnotherSession('alice')
 
-      await user.type(
-        screen.getByLabelText(/describe your spending/i),
-        'spent $5{Enter}',
-      )
+      await user.type(screen.getByLabelText(/ask ledger/i), 'spent $5{Enter}')
 
       expect(
         await screen.findByRole('heading', { name: /sign in/i }),
@@ -100,7 +97,7 @@ describe('given sisi on the Users page', () => {
     )
   })
 
-  it('approves a pending user, who can then sign in to the chat', async () => {
+  it('approves a pending user, who can then sign in', async () => {
     const { user } = await openUsersAsSisi()
     await user.click(await screen.findByRole('button', { name: 'Approve bob' }))
     expect(await screen.findByText(/no pending users/i)).toBeInTheDocument()
@@ -108,9 +105,7 @@ describe('given sisi on the Users page', () => {
     expect(await screen.findByText('bob')).toBeInTheDocument()
 
     await signOutAndSignInAs(user, 'bob', 'bob-password')
-    expect(
-      await screen.findByLabelText(/describe your spending/i),
-    ).toBeInTheDocument()
+    expect(await screen.findByLabelText(/ask ledger/i)).toBeInTheDocument()
   })
 
   it('rejects a pending user, who then cannot sign in', async () => {

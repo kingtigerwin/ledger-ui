@@ -2,9 +2,10 @@
 
 The web UI for [ledger-api](https://github.com/kingtigerwin/ledger-api) and [ledger-agent](https://github.com/kingtigerwin/ledger-agent): React 19, React Router, React Context for auth, TanStack Query, Tailwind. Served at `https://ledger.haoran.cloud` from S3 behind CloudFront, deployed by GitHub Actions with AWS CDK.
 
-- **Sign in** (`/login`): username and password. Active users go to the chat; pending users go to the waiting page.
+- **Sign in** (`/login`): username and password. Active users go to Home; pending users go to the waiting page.
 - **Register** (`/register`, linked from sign in): creates a `pending` account.
-- **Waiting** (`/pending`): where pending users land. Only password sign-ups wait for approval; Google users go straight to the chat. It has no chat, and they hold no token.
+- **Waiting** (`/pending`): where pending users land. Only password sign-ups wait for approval; Google users go straight to Home. It has no chat, and they hold no token.
+- **Home** (`/`, signed-in only): this month's spend, with a breakdown by category, and the cards ledger-api found that need attention: car rego coming due, an expense possibly recorded twice, a price rise. The rules are in ledger-api, the wording is here. Each card can be dismissed, and a possible duplicate can be deleted. The box at the bottom sends its question to the chat.
 - **Chat** (`/chat`, signed-in only): describe spending in plain words; ledger-agent records it or answers questions about it. Each person gets 5 messages a day and everyone together 300, which ledger-agent enforces.
 - **Users** (`/admin`, admins such as `sisi` only): pending, active and disabled users. Approve enables a user (they can then sign in); Reject disables them (they can't).
 
@@ -28,7 +29,7 @@ npm test           # Vitest + Testing Library, backends mocked with MSW
 npm run typecheck && npm run lint
 ```
 
-To run without the real backends, copy `.env.example` to `.env.local` and set `VITE_USE_MOCKS=true`: an in-memory mock (`src/mocks/handlers.ts`) answers instead, with users `sisi` / `sisi-password` (admin), `alice` / `alice-password` (active) and `bob` / `bob-password` (pending). `API_ORIGIN` and `AGENT_ORIGIN` point the dev proxy elsewhere, e.g. `API_ORIGIN=http://localhost:3000 npm run dev`.
+To run without the real backends, copy `.env.example` to `.env.local` and set `VITE_USE_MOCKS=true`: an in-memory mock (`src/mocks/handlers.ts`) answers instead, with users `sisi` / `sisi-password` (admin), `alice` / `alice-password` (active, with one of each Home card) and `bob` / `bob-password` (pending). `API_ORIGIN` and `AGENT_ORIGIN` point the dev proxy elsewhere, e.g. `API_ORIGIN=http://localhost:3000 npm run dev`.
 
 ## Infrastructure
 

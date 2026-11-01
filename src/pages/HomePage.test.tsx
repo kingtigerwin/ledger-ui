@@ -1,0 +1,340 @@
+import { screen, waitFor, within } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { seedInsight, seedTransaction } from '../mocks/handlers'
+import { possibleDuplicate, priceRise, regoDue } from '../mocks/insights'
+import { server } from '../mocks/server'
+import { renderApp, signIn } from '../test/renderApp'
+
+async function openHome(username = 'alice') {
+  const app = renderApp('/login')
+  await signIn(app.user, username, `${username}-password`)
+  await screen.findByRole('heading', { name: /^good/i })
+  return app
+}
+
+const card = (title: RegExp) => {
+  const heading = screen.getByRole('heading', { name: title })
+  return within(heading.closest('li') as HTMLElement)
+}
+
+describe('given alice on the Home page', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('is where signing in lands, and every tab is reachable', async () => {
+    await openHome()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByRole('link', { name: 'Chat' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Users' })).toBeNull()
+  })
+
+  describe('this month’s spend', () => {
+    it('shows the total, and the categories when opened', async () => {
+      seedTransaction('alice', 12345)
+      const { user } = await openHome()
+
+      const total = await screen.findByRole('button', { name: /\$123\.45/ })
+      expect(screen.queryByTestId('summary-total')).toBeNull()
+      await user.click(total)
+
+      expect(screen.getByTestId('summary-total')).toHaveTextContent('$123.45')
+    })
+
+    it("doesn't count anyone else's spending", async () => {
+      seedTransaction('sisi', 500)
+      await openHome()
+      expect(
+        await screen.findByRole('button', { name: /\$0\.00/ }),
+      ).toBeInTheDocument()
+    })
+
+    it('asks for the month and day where the customer is', async () => {
+      const urls: string[] = []
+      server.events.on('request:start', ({ request }) => {
+        urls.push(request.url)
+      })
+      await openHome()
+      await screen.findByRole('button', { name: /\$0\.00/ })
+      server.events.removeAllListeners()
+
+      expect(urls.join()).toMatch(/summary\?month=\d{4}-\d{2}(,|$)/)
+      expect(urls.join()).toMatch(/insights\?today=\d{4}-\d{2}-\d{2}(,|$)/)
+    })
+
+    it('still shows the cards when the total fails', async () => {
+      seedInsight('alice', regoDue)
+      server.use(
+        http.get('*/api/v1/transactions/summary', () =>
+          HttpResponse.json({}, { status: 500 }),
+        ),
+      )
+      await openHome()
+
+      expect(
+        await screen.findByRole('heading', { name: /car rego/i }),
+      ).toBeInTheDocument()
+      expect(await screen.findByRole('alert')).toHaveTextContent(/spend/i)
+    })
+  })
+
+  describe('with nothing needing attention', () => {
+    it('says so, hides the count and suggests adding past expenses', async () => {
+      await openHome()
+
+      expect(
+        await screen.findByText(/nothing needs your attention/i),
+      ).toBeInTheDocument()
+      expect(screen.getByText(/last november/i)).toBeInTheDocument()
+      expect(screen.queryByText('To review')).toBeNull()
+    })
+  })
+
+  describe('with cards', () => {
+    it('counts however many there are, in the order they came', async () => {
+      seedInsight('alice', regoDue)
+      seedInsight('alice', possibleDuplicate)
+      seedInsight('alice', priceRise)
+      await openHome()
+
+      const list = await screen.findByRole('list', {
+        name: /needs your attention/i,
+      })
+      expect(
+        within(list)
+          .getAllByRole('heading')
+          .map((h) => h.textContent),
+      ).toEqual([
+        'Car rego due around 14 Nov 2026',
+        'Possibly recorded twice',
+        'Netflix went up',
+      ])
+      expect(screen.getByTestId('to-review')).toHaveTextContent('3')
+    })
+
+    it('still shows the total when the cards fail', async () => {
+      seedTransaction('alice', 500)
+      server.use(
+        http.get('*/api/v1/insights', () =>
+          HttpResponse.json({}, { status: 500 }),
+        ),
+      )
+      await openHome()
+
+      expect(
+        await screen.findByRole('button', { name: /\$5\.00/ }),
+      ).toBeInTheDocument()
+      expect(await screen.findByRole('alert')).toHaveTextContent(/attention/i)
+    })
+
+    it('says a rego estimated in the past may be overdue', async () => {
+      seedInsight('alice', { ...regoDue, estimatedDueDate: '2000-01-01' })
+      await openHome()
+
+      expect(
+        await screen.findByRole('heading', { name: /was due around/i }),
+      ).toBeInTheDocument()
+    })
+
+    it('explains a price rise and shows its charges in place', async () => {
+      seedInsight('alice', priceRise)
+      const { user } = await openHome()
+      await screen.findByRole('heading', { name: 'Netflix went up' })
+      const netflix = card(/netflix/i)
+
+      expect(
+        netflix.getByText(
+          '$16.99 → $20.99 since 3 Oct 2026, $48.00 more a year',
+        ),
+      ).toBeInTheDocument()
+      await user.click(netflix.getByRole('button', { name: 'View charges' }))
+
+      expect(netflix.getAllByText('subscription')).toHaveLength(3)
+    })
+
+    it('keeps stored Chinese as it is', async () => {
+      seedInsight('alice', possibleDuplicate)
+      const { user } = await openHome()
+      await screen.findByRole('heading', { name: /recorded twice/i })
+
+      await user.click(screen.getByRole('button', { name: 'Review' }))
+
+      expect(screen.getAllByText('菜')).toHaveLength(2)
+    })
+
+    it('hides a dismissed card, and it stays hidden', async () => {
+      seedInsight('alice', regoDue)
+      const { user } = await openHome()
+      await screen.findByRole('heading', { name: /car rego/i })
+
+      await user.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+      expect(
+        await screen.findByText(/nothing needs your attention/i),
+      ).toBeInTheDocument()
+    })
+
+    it('calls dismissing a possible duplicate what it means', async () => {
+      seedInsight('alice', possibleDuplicate)
+      const { user } = await openHome()
+      await screen.findByRole('heading', { name: /recorded twice/i })
+
+      await user.click(screen.getByRole('button', { name: 'Not a duplicate' }))
+
+      expect(
+        await screen.findByText(/nothing needs your attention/i),
+      ).toBeInTheDocument()
+    })
+
+    it('deletes one of a pair once confirmed, which clears the card', async () => {
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+      seedInsight('alice', possibleDuplicate)
+      const { user } = await openHome()
+      await screen.findByRole('heading', { name: /recorded twice/i })
+
+      await user.click(screen.getByRole('button', { name: 'Review' }))
+      await user.click(
+        screen.getByRole('button', { name: /delete .* 30 oct 2026/i }),
+      )
+
+      expect(confirm).toHaveBeenCalledWith(
+        expect.stringMatching(/can't be undone/i),
+      )
+      expect(
+        await screen.findByText(/nothing needs your attention/i),
+      ).toBeInTheDocument()
+    })
+
+    it('keeps both if they change their mind', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false)
+      seedInsight('alice', possibleDuplicate)
+      const { user } = await openHome()
+      await screen.findByRole('heading', { name: /recorded twice/i })
+
+      await user.click(screen.getByRole('button', { name: 'Review' }))
+      await user.click(
+        screen.getByRole('button', { name: /delete .* 30 oct 2026/i }),
+      )
+
+      expect(
+        screen.getByRole('heading', { name: /recorded twice/i }),
+      ).toBeInTheDocument()
+      expect(screen.getAllByText('菜')).toHaveLength(2)
+    })
+
+    it('says so when a delete fails', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      seedInsight('alice', possibleDuplicate)
+      server.use(
+        http.delete('*/api/v1/transactions/:id', () =>
+          HttpResponse.json(
+            { error: { code: 'nope', message: 'Could not delete that' } },
+            { status: 500 },
+          ),
+        ),
+      )
+      const { user } = await openHome()
+      await screen.findByRole('heading', { name: /recorded twice/i })
+
+      await user.click(screen.getByRole('button', { name: 'Review' }))
+      await user.click(
+        screen.getByRole('button', { name: /delete .* 30 oct 2026/i }),
+      )
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Could not delete that',
+      )
+    })
+  })
+
+  describe('asking from Home', () => {
+    it('sends the question to the chat and shows the answer there', async () => {
+      const { user } = await openHome()
+
+      await user.type(
+        screen.getByLabelText(/ask ledger/i),
+        'Coffee for $5{Enter}',
+      )
+
+      expect(await screen.findByText('Recorded $5.00.')).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Chat' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+    })
+
+    it('sends nothing for an empty box', async () => {
+      const { user } = await openHome()
+      await user.type(screen.getByLabelText(/ask ledger/i), '   {Enter}')
+      expect(screen.getByRole('heading', { name: /^good/i })).toBeVisible()
+    })
+  })
+
+  describe('after recording in the chat', () => {
+    it('shows the new total back on Home', async () => {
+      const { user } = await openHome()
+      await screen.findByRole('button', { name: /\$0\.00/ })
+
+      await user.type(
+        screen.getByLabelText(/ask ledger/i),
+        'Coffee for $5{Enter}',
+      )
+      await screen.findByText('Recorded $5.00.')
+      await user.click(screen.getByRole('link', { name: 'Home' }))
+
+      expect(
+        await screen.findByRole('button', { name: /\$5\.00/ }),
+      ).toBeInTheDocument()
+    })
+  })
+})
+
+describe('given a conversation in the chat', () => {
+  it('survives moving to another tab and back', async () => {
+    const { user } = await openHome()
+    await user.click(screen.getByRole('link', { name: 'Chat' }))
+    await user.type(
+      await screen.findByLabelText(/describe your spending/i),
+      'Spent $6 on coffee{Enter}',
+    )
+    await screen.findByText('Recorded $6.00.')
+
+    await user.click(screen.getByRole('link', { name: 'Home' }))
+    await screen.findByRole('heading', { name: /^good/i })
+    await user.click(screen.getByRole('link', { name: 'Chat' }))
+
+    expect(screen.getByText('Recorded $6.00.')).toBeInTheDocument()
+  })
+
+  it('is gone for the next person after signing out', async () => {
+    const { user } = await openHome()
+    await user.click(screen.getByRole('link', { name: 'Chat' }))
+    await user.type(
+      await screen.findByLabelText(/describe your spending/i),
+      'Spent $6 on coffee{Enter}',
+    )
+    await screen.findByText('Recorded $6.00.')
+
+    await user.click(screen.getByRole('button', { name: /sign out/i }))
+    await signIn(user, 'sisi', 'sisi-password')
+    await user.click(await screen.findByRole('link', { name: 'Chat' }))
+
+    await waitFor(() =>
+      expect(screen.getByText(/what did you spend today/i)).toBeInTheDocument(),
+    )
+    expect(screen.queryByText('Recorded $6.00.')).toBeNull()
+  })
+})
+
+describe('given sisi, an admin', () => {
+  it('has all three tabs and lands on Home', async () => {
+    await openHome('sisi')
+    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Chat' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Users' })).toBeInTheDocument()
+  })
+})
