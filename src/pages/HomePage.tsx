@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AppHeader } from '../components/AppHeader'
 import { AskBox } from '../components/AskBox'
 import { InsightCard } from '../components/InsightCard'
+import { ReceiptScanner } from '../components/ReceiptScanner'
 import { SummaryCard } from '../components/SummaryCard'
 import {
   formatCents,
@@ -114,6 +115,8 @@ export function HomePage() {
               </div>
             )}
           </div>
+
+          <ReceiptScanner />
 
           <section className="flex flex-col gap-3">
             <h2 className="font-medium text-slate-800">{ATTENTION_HEADING}</h2>
