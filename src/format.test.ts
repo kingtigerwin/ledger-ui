@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { greeting, localDate, localMonth } from './format'
+import { greeting, localDate, localMonth, previousMonth } from './format'
 
 describe('given the customer local clock', () => {
   it('keeps the local date just after midnight on the 1st', () => {
     const now = new Date(2026, 10, 1, 0, 30)
     expect(localDate(now)).toBe('2026-11-01')
     expect(localMonth(now)).toBe('2026-11')
+  })
+
+  it.each([
+    ['2026-11', '2026-10'],
+    ['2026-01', '2025-12'],
+  ])('the month before %s is %s', (month, expected) => {
+    expect(previousMonth(month)).toBe(expected)
   })
 
   it.each([

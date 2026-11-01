@@ -18,6 +18,12 @@ export function localDate(now: Date): string {
   return `${localMonth(now)}-${pad(now.getDate())}`
 }
 
+/** "2026-01" → "2025-12" */
+export function previousMonth(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return localMonth(new Date(y, m - 2, 1))
+}
+
 export function greeting(now: Date): string {
   const hour = now.getHours()
   if (hour < 12) return 'Good morning'

@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { localMonth } from '../format'
 import { seedInsight, seedTransaction } from '../mocks/handlers'
 import { possibleDuplicate, priceRise, regoDue } from '../mocks/insights'
 import { server } from '../mocks/server'
@@ -48,9 +49,7 @@ describe('given alice on the Home page', () => {
     it("doesn't count anyone else's spending", async () => {
       seedTransaction('sisi', 500)
       await openHome()
-      expect(
-        await screen.findByRole('button', { name: /\$0\.00/ }),
-      ).toBeInTheDocument()
+      expect(await screen.findByTestId('spend-total')).toBeInTheDocument()
     })
 
     it('asks for the month and day where the customer is', async () => {
@@ -59,11 +58,59 @@ describe('given alice on the Home page', () => {
         urls.push(request.url)
       })
       await openHome()
-      await screen.findByRole('button', { name: /\$0\.00/ })
+      await screen.findByTestId('spend-total')
       server.events.removeAllListeners()
 
       expect(urls.join()).toMatch(/summary\?month=\d{4}-\d{2}(,|$)/)
       expect(urls.join()).toMatch(/insights\?today=\d{4}-\d{2}-\d{2}(,|$)/)
+    })
+
+    describe('with nothing recorded yet this month', () => {
+      const summaryOf = (lastMonthCents: number) =>
+        http.get('*/api/v1/transactions/summary', ({ request }) => {
+          const month = new URL(request.url).searchParams.get('month') ?? ''
+          const thisMonth = month === localMonth(new Date())
+          const totalCents = thisMonth ? 0 : lastMonthCents
+          return HttpResponse.json({
+            month,
+            currency: 'AUD',
+            totalCents,
+            byCategory: [],
+          })
+        })
+
+      it('says so and shows last month, with nothing to open', async () => {
+        server.use(summaryOf(68600))
+        await openHome()
+
+        expect(
+          await screen.findByText(/nothing recorded yet this month/i),
+        ).toBeInTheDocument()
+        expect(await screen.findByText(/: \$686\.00/)).toBeInTheDocument()
+        expect(screen.queryByText('by category')).toBeNull()
+      })
+
+      it('leaves last month out when that was empty too', async () => {
+        server.use(summaryOf(0))
+        await openHome()
+
+        expect(
+          await screen.findByText(/^nothing recorded yet this month$/i),
+        ).toBeInTheDocument()
+      })
+    })
+
+    it('asks for last month only when this month is empty', async () => {
+      seedTransaction('alice', 500)
+      const urls: string[] = []
+      server.events.on('request:start', ({ request }) => {
+        if (request.url.includes('/summary')) urls.push(request.url)
+      })
+      await openHome()
+      await screen.findByRole('button', { name: /\$5\.00/ })
+      server.events.removeAllListeners()
+
+      expect(new Set(urls).size).toBe(1)
     })
 
     it('still shows the cards when the total fails', async () => {
@@ -277,7 +324,7 @@ describe('given alice on the Home page', () => {
   describe('after recording in the chat', () => {
     it('shows the new total back on Home', async () => {
       const { user } = await openHome()
-      await screen.findByRole('button', { name: /\$0\.00/ })
+      await screen.findByTestId('spend-total')
 
       await user.type(
         screen.getByLabelText(/ask ledger/i),
