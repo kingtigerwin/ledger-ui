@@ -1,5 +1,5 @@
 import type { Transaction } from '../api/types'
-import { formatCents } from '../format'
+import { capitalise, formatCents } from '../format'
 
 const Row = ({
   label,
@@ -18,7 +18,7 @@ const Row = ({
   </div>
 )
 
-/** What's on the receipt: names as printed, so they can be checked against the paper. */
+/** What's on the receipt: plain names to read, over names as printed to check against the paper. */
 export function ReceiptItems({ transaction }: { transaction: Transaction }) {
   const { currency, receipt } = transaction
   if (!receipt) return null
@@ -34,9 +34,14 @@ export function ReceiptItems({ transaction }: { transaction: Transaction }) {
       <ul aria-label="Receipt items" className="divide-y divide-slate-100">
         {receipt.lines?.map((line, i) => (
           <li key={i} className="flex justify-between gap-3 px-3 py-1.5">
-            <span className="min-w-0 break-words text-slate-900">
-              {line.name}
-            </span>
+            <div className="min-w-0 break-words">
+              <div className="text-slate-900">
+                {capitalise(line.product ?? line.name)}
+              </div>
+              {line.product && (
+                <div className="text-xs text-slate-500">{line.name}</div>
+              )}
+            </div>
             <span className="shrink-0 tabular-nums">
               {formatCents(line.amountCents, currency)}
             </span>

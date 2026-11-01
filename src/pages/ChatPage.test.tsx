@@ -182,6 +182,7 @@ describe('given a question about something bought', () => {
         date: '2026-11-01',
         merchant: 'Coles',
         name: 'BANANAS PERKG',
+        product: 'bananas',
         amountCents: 284,
       },
       {
@@ -189,6 +190,7 @@ describe('given a question about something bought', () => {
         date: '2026-10-30',
         merchant: null,
         name: 'bananas',
+        product: null,
         amountCents: 392,
       },
     ],
@@ -227,8 +229,8 @@ describe('given a question about something bought', () => {
         .getAllByRole('listitem')
         .map((row) => row.textContent),
     ).toEqual([
-      'BANANAS PERKGColes · 1 Nov 2026$2.84',
-      'bananas30 Oct 2026$3.92',
+      'BananasBANANAS PERKG · Coles · 1 Nov 2026$2.84',
+      'Bananas30 Oct 2026$3.92',
     ])
     expect(screen.getByTestId('purchases-total')).toHaveTextContent('$6.76')
   })

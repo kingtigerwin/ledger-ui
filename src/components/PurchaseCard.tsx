@@ -1,5 +1,5 @@
 import type { PurchaseSearch } from '../api/types'
-import { formatCents, formatDate } from '../format'
+import { capitalise, formatCents, formatDate } from '../format'
 
 /** The lines ledger-api matched for "how much did I spend on bananas?". */
 export function PurchaseCard({ search }: { search: PurchaseSearch }) {
@@ -20,10 +20,14 @@ export function PurchaseCard({ search }: { search: PurchaseSearch }) {
           >
             <div className="min-w-0">
               <div className="font-medium break-words text-slate-900">
-                {match.name}
+                {capitalise(match.product ?? match.name)}
               </div>
               <div className="text-xs text-slate-500">
-                {[match.merchant, formatDate(match.date)]
+                {[
+                  match.product && match.name,
+                  match.merchant,
+                  formatDate(match.date),
+                ]
                   .filter(Boolean)
                   .join(' · ')}
               </div>

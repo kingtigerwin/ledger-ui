@@ -169,6 +169,8 @@ export interface PurchaseSearch {
     merchant: string | null
     /** As printed on a receipt, or the item of a typed expense. */
     name: string
+    /** In plain words, when a receipt line has it. */
+    product: string | null
     amountCents: number
   }[]
   count: number
