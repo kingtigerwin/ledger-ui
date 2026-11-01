@@ -1,9 +1,12 @@
 import { http, HttpResponse } from 'msw'
+import { readReply } from './receipts'
 import type {
   AdminUser,
   ChatRequest,
   ChatResponse,
   Insight,
+  NewTransaction,
+  ReadReceiptResponse,
   Transaction,
   UserStatus,
 } from '../api/types'
@@ -24,6 +27,7 @@ const db = {
   tokenGeneration: 0,
   transactions: [] as MockTransaction[],
   insights: new Map<string, Insight[]>(),
+  receiptReply: readReply(),
 }
 
 let nextId = 1
@@ -52,6 +56,7 @@ export function resetMockDb() {
   db.tokenGeneration = 0
   db.transactions = []
   db.insights.clear()
+  db.receiptReply = readReply()
   seedUser('sisi', 'sisi-password', { role: 'admin', status: 'active' })
   seedUser('alice', 'alice-password', {
     status: 'active',
@@ -66,6 +71,15 @@ export function seedTransaction(username: string, amountCents: number) {
   if (!user) throw new Error(`No mock user ${username}`)
   db.transactions.push(newTransaction(user.id, amountCents))
 }
+
+/** What the agent reads the next photos as. */
+export function seedReceiptReply(reply: ReadReceiptResponse) {
+  db.receiptReply = reply
+}
+
+/** What's in `username`'s ledger. */
+export const findTransactions = (username: string) =>
+  db.transactions.filter((t) => t.userId === findUser(username)?.id)
 
 /** Gives `username` a card on the Home page; ledger-api's rules are tested there, not here. */
 export function seedInsight(username: string, insight: Insight) {
@@ -99,6 +113,7 @@ const newTransaction = (
   item: 'expense',
   amountCents,
   currency: 'AUD',
+  version: 1,
   userId,
 })
 
@@ -369,6 +384,58 @@ export const handlers = [
         ),
       ),
     ),
+  ),
+
+  http.get(
+    '*/api/v1/transactions',
+    withUser((user, { request }) => {
+      const query = new URL(request.url).searchParams
+      const items = db.transactions
+        .filter(
+          (t) =>
+            t.userId === user.id &&
+            t.date >= (query.get('from') ?? '') &&
+            t.date <= (query.get('to') ?? '9999'),
+        )
+        .map(withoutOwner)
+      return HttpResponse.json({ items, nextCursor: null })
+    }),
+  ),
+
+  http.post(
+    '*/api/v1/transactions',
+    withUser(async (user, { request }) => {
+      const body = (await request.json()) as NewTransaction
+      const stored = db.transactions.find((t) => t.id === body.id)
+      if (stored) return HttpResponse.json(withoutOwner(stored))
+      const transaction = { ...body, version: 1, userId: user.id }
+      db.transactions.push(transaction)
+      return HttpResponse.json(withoutOwner(transaction), { status: 201 })
+    }),
+  ),
+
+  http.patch(
+    '*/api/v1/transactions/:id',
+    withUser(async (user, { params, request }) => {
+      const stored = db.transactions.find(
+        (t) => t.id === params.id && t.userId === user.id,
+      )
+      if (!stored) {
+        return apiError(404, 'transaction_not_found', 'No such transaction')
+      }
+      const { version, ...edit } =
+        (await request.json()) as Partial<Transaction>
+      if (version !== stored.version) {
+        return apiError(409, 'version_conflict', 'Reload it and try again')
+      }
+      Object.assign(stored, edit, { version: (stored.version ?? 1) + 1 })
+      return HttpResponse.json(withoutOwner(stored))
+    }),
+  ),
+
+  http.post(
+    '*/agent/v1/receipts/read',
+    withUser(() => HttpResponse.json(db.receiptReply)),
   ),
 
   http.delete(
