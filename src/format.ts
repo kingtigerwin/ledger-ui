@@ -1,5 +1,9 @@
 const LOCALE = 'en-AU'
 
+export function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 export function formatCurrency(amount: number, currency = 'AUD'): string {
   return new Intl.NumberFormat(LOCALE, { style: 'currency', currency }).format(
     amount,

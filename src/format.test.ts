@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { greeting, localDate, localMonth, previousMonth } from './format'
+import {
+  capitalise,
+  greeting,
+  localDate,
+  localMonth,
+  previousMonth,
+} from './format'
+
+describe('given a plain product name', () => {
+  it.each([
+    ['chicken drumsticks', 'Chicken drumsticks'],
+    ['香蕉', '香蕉'],
+    ['', ''],
+  ])('writes %s as %s', (text, expected) => {
+    expect(capitalise(text)).toBe(expected)
+  })
+})
 
 describe('given the customer local clock', () => {
   it('keeps the local date just after midnight on the 1st', () => {

@@ -378,10 +378,27 @@ describe('given a recorded receipt', () => {
         .getAllByRole('listitem')
         .map((row) => row.textContent),
     ).toEqual([
-      'PI PERFECT BAKES 450$8.50',
-      'COLES BEEF MINCE 4ST$15.50',
-      'CLS CHICKEN MINCE$6.50',
+      'Pasta bakePI PERFECT BAKES 450$8.50',
+      'Beef minceCOLES BEEF MINCE 4ST$15.50',
+      'Chicken minceCLS CHICKEN MINCE$6.50',
     ])
+  })
+
+  it('shows only the printed name for a line with no plain name', async () => {
+    await scan(
+      readReply({
+        receipt: {
+          ...flybuysReceipt,
+          lines: [{ name: 'MISC ITEM', amountCents: 3050 }],
+        },
+      }),
+    )
+    await screen.findByRole('status')
+
+    const items = screen.getByRole('list', { name: 'Receipt items' })
+    expect(within(items).getByRole('listitem').textContent).toBe(
+      'MISC ITEM$30.50',
+    )
   })
 
   it('shows the receipt total, savings and where it was', async () => {

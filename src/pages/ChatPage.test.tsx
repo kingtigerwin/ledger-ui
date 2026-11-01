@@ -174,6 +174,105 @@ describe('given alice on the chat page', () => {
   })
 })
 
+describe('given a question about something bought', () => {
+  const found = (fields: object = {}) => ({
+    matches: [
+      {
+        transactionId: 'a',
+        date: '2026-11-01',
+        merchant: 'Coles',
+        name: 'BANANAS PERKG',
+        product: 'bananas',
+        amountCents: 284,
+      },
+      {
+        transactionId: 'b',
+        date: '2026-10-30',
+        merchant: null,
+        name: 'bananas',
+        product: null,
+        amountCents: 392,
+      },
+    ],
+    count: 2,
+    totalCents: 676,
+    currency: 'AUD',
+    includesPoints: false,
+    from: '2026-10-01',
+    to: '2026-11-01',
+    ...fields,
+  })
+
+  async function ask(purchases: object[]) {
+    server.use(
+      http.post('*/agent/v1/chat', () =>
+        HttpResponse.json({
+          reply: 'You spent $6.76 on bananas.',
+          transactions: [],
+          listed: [],
+          summaries: [],
+          purchases,
+        }),
+      ),
+    )
+    const { user, input } = await openChat()
+    await user.type(input, 'How much on bananas?{Enter}')
+    await screen.findByText('You spent $6.76 on bananas.')
+  }
+
+  it('lists what matched, newest first, with the total', async () => {
+    await ask([found()])
+
+    const rows = screen.getByRole('list', { name: 'Purchases found' })
+    expect(
+      within(rows)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent),
+    ).toEqual([
+      'BananasBANANAS PERKG · Coles · 1 Nov 2026$2.84',
+      'Bananas30 Oct 2026$3.92',
+    ])
+    expect(screen.getByTestId('purchases-total')).toHaveTextContent('$6.76')
+  })
+
+  it('says what period it covered', async () => {
+    await ask([found()])
+
+    expect(screen.getByText('1 Oct 2026 to 1 Nov 2026')).toBeInTheDocument()
+  })
+
+  it('says when not every match is shown', async () => {
+    await ask([found({ count: 140 })])
+
+    expect(screen.getByText(/showing 2 of 140/i)).toBeInTheDocument()
+  })
+
+  it('stays quiet about that when they all are', async () => {
+    await ask([found()])
+
+    expect(screen.queryByText(/showing/i)).toBeNull()
+  })
+
+  it('says when these are shelf prices', async () => {
+    await ask([found({ includesPoints: true })])
+
+    expect(screen.getByText(/shelf prices/i)).toBeInTheDocument()
+  })
+
+  it('shows no table when nothing matched', async () => {
+    await ask([found({ matches: [], count: 0, totalCents: 0 })])
+
+    expect(screen.queryByRole('list', { name: 'Purchases found' })).toBeNull()
+  })
+
+  it('copes with an agent that sends no purchases', async () => {
+    const { user, input } = await openChat()
+    await user.type(input, 'Spent $6 on coffee{Enter}')
+
+    expect(await screen.findByText('Recorded $6.00.')).toBeInTheDocument()
+  })
+})
+
 describe('given sisi, an admin, on the chat page', () => {
   it("lists everyone's transactions with whose they are and subtotals", async () => {
     seedTransaction('alice', 500)

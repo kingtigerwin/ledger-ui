@@ -1,5 +1,6 @@
 import { formatTime } from '../format'
 import type { ChatMessage } from '../types'
+import { PurchaseCard } from './PurchaseCard'
 import { SummaryCard } from './SummaryCard'
 import { TransactionCard } from './TransactionCard'
 
@@ -50,6 +51,9 @@ export function MessageBubble({
         )}
         {message.summaries?.map((summary) => (
           <SummaryCard key={summary.month} summary={summary} />
+        ))}
+        {message.purchases?.map((search, i) => (
+          <PurchaseCard key={i} search={search} />
         ))}
         <span
           className={`mt-1 text-xs text-slate-400 ${isUser ? 'self-end' : 'self-start'}`}

@@ -63,6 +63,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             transactions: response.transactions,
             listed: response.listed,
             summaries: response.summaries,
+            purchases: response.purchases,
           }),
         ])
         if (response.transactions.length > 0) {

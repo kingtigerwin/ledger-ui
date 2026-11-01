@@ -160,6 +160,28 @@ export interface RegoDue extends InsightBase {
 /** An item of `GET /api/v1/insights`. The UI writes the wording; only stored text isn't English. */
 export type Insight = PossibleDuplicate | PriceRise | RegoDue
 
+/** What `search_purchases` found, for "how much did I spend on bananas?". */
+export interface PurchaseSearch {
+  /** At most 100; `count` and `totalCents` cover everything found. */
+  matches: {
+    transactionId: string
+    date: string
+    merchant: string | null
+    /** As printed on a receipt, or the item of a typed expense. */
+    name: string
+    /** In plain words, when a receipt line has it. */
+    product: string | null
+    amountCents: number
+  }[]
+  count: number
+  totalCents: number
+  currency: string
+  /** Line amounts are shelf prices, so some of the total was paid with points. */
+  includesPoints: boolean
+  from: string
+  to: string
+}
+
 export interface ChatTurn {
   role: 'user' | 'assistant'
   content: string
@@ -178,4 +200,6 @@ export interface ChatResponse {
   /** What this turn looked up. */
   listed: Transaction[]
   summaries: MonthlySummary[]
+  /** Optional, so a UI deployed ahead of ledger-agent still works. */
+  purchases?: PurchaseSearch[]
 }
