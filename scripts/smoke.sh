@@ -24,4 +24,7 @@ check 'app route /chat' 200 text/html "$UI_URL/chat"
 check 'ledger-api via /api' 401 application/json "$UI_URL/api/v1/auth/me"
 check 'ledger-agent via /agent' 401 application/json -X POST \
   -H 'content-type: application/json' -d '{"messages":[],"timeZone":"UTC"}' "$UI_URL/agent/v1/chat"
+for name in $(jq -r '.context.customDomain.redirectDomains[]' cdk.json); do
+  check "$name redirects" 301 '' "https://$name/login"
+done
 exit $fail

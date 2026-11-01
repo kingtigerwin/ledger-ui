@@ -53,6 +53,10 @@ export interface UiStackProps extends StackProps {
  * The UI: a private S3 bucket behind CloudFront, which also forwards /api/* to ledger-api and
  * /agent/* to ledger-agent. One origin for the browser means no CORS, and ledger-api's
  * HttpOnly refresh cookie (Path=/api/v1/auth) is first-party to ledger.haoran.cloud.
+ *
+ * Other names redirect rather than serve the app: Google sends users back to the one redirect
+ * URI, on domainName, and the sign-in cookie set before leaving is only sent to the host that
+ * set it, so signing in from any other host fails. It also keeps sessions on one host.
  */
 export class UiStack extends Stack {
   constructor(scope: Construct, id: string, props: UiStackProps) {
@@ -67,14 +71,28 @@ export class UiStack extends Stack {
       autoDeleteObjects: true,
     })
 
-    // App routes (/login, /chat, /admin) have no file in the bucket; serve the app for them.
+    // Sends other names to the main one, then, as app routes (/login, /chat, /admin) have no
+    // file in the bucket, serves the app for them.
     // This runs only on the bucket's behaviour: an error page rule would also rewrite the
     // API's own 403s and 404s (such as account_pending) into index.html.
+    const { domainName, redirectDomains, zoneName, hostedZoneId } = props.domain
     const spaRewrite = new CloudFrontFunction(this, 'SpaRewrite', {
       runtime: FunctionRuntime.JS_2_0,
       code: FunctionCode.fromInline(`
 function handler(event) {
   var request = event.request;
+  if (${JSON.stringify(redirectDomains)}.indexOf(request.headers.host.value) !== -1) {
+    var query = Object.keys(request.querystring).map(function (key) {
+      return key + '=' + request.querystring[key].value;
+    }).join('&');
+    return {
+      statusCode: 301,
+      statusDescription: 'Moved Permanently',
+      headers: {
+        location: { value: 'https://${domainName}' + request.uri + (query && '?' + query) },
+      },
+    };
+  }
   if (request.uri.indexOf('.') === -1) request.uri = '/index.html';
   return request;
 }`),
@@ -131,7 +149,7 @@ function handler(event) {
         ),
       },
       defaultRootObject: 'index.html',
-      domainNames: [props.domain.domainName],
+      domainNames: [domainName, ...redirectDomains],
       certificate: props.domain.certificate,
       priceClass: PriceClass.PRICE_CLASS_100,
     })
@@ -162,17 +180,32 @@ function handler(event) {
 
     // Only adds the UI's own records; the zone and its other records belong to whoever manages the domain.
     const zone = HostedZone.fromHostedZoneAttributes(this, 'Zone', {
-      zoneName: props.domain.zoneName,
-      hostedZoneId: props.domain.hostedZoneId,
+      zoneName,
+      hostedZoneId,
     })
     const target = RecordTarget.fromAlias(new CloudFrontTarget(distribution))
-    const recordName = props.domain.domainName
-    new ARecord(this, 'UiAliasIpv4', { zone, recordName, target })
-    new AaaaRecord(this, 'UiAliasIpv6', { zone, recordName, target })
+    new ARecord(this, 'UiAliasIpv4', { zone, recordName: domainName, target })
+    new AaaaRecord(this, 'UiAliasIpv6', {
+      zone,
+      recordName: domainName,
+      target,
+    })
+    for (const recordName of redirectDomains) {
+      new ARecord(this, `Redirect-${recordName}-Ipv4`, {
+        zone,
+        recordName,
+        target,
+      })
+      new AaaaRecord(this, `Redirect-${recordName}-Ipv6`, {
+        zone,
+        recordName,
+        target,
+      })
+    }
 
     new CfnOutput(this, 'CloudFrontUrl', {
       value: `https://${distribution.distributionDomainName}`,
     })
-    new CfnOutput(this, 'UiUrl', { value: `https://${recordName}` })
+    new CfnOutput(this, 'UiUrl', { value: `https://${domainName}` })
   }
 }

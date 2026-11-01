@@ -36,11 +36,13 @@ To run without the real backends, copy `.env.example` to `.env.local` and set `V
 
 | Stack | Region | What |
 |---|---|---|
-| `LedgerUiCertificate` | us-east-1 | ACM certificate for `ledger.haoran.cloud` (CloudFront only takes certificates from there), DNS-validated in the existing `haoran.cloud` zone. |
-| `LedgerUi` | ap-southeast-2 | Private S3 bucket (Origin Access Control), CloudFront with the routes above, security headers, the build uploaded with `BucketDeployment` (hashed assets cached for a year, `index.html` revalidated every load), and `A`/`AAAA` alias records for `ledger.haoran.cloud`. |
+| `LedgerUiCertificates` | us-east-1 | ACM certificate for `ledger.haoran.cloud` and `chace.haoran.cloud` (CloudFront only takes certificates from there), DNS-validated in the existing `haoran.cloud` zone. |
+| `LedgerUi` | ap-southeast-2 | Private S3 bucket (Origin Access Control), CloudFront with the routes above, security headers, the build uploaded with `BucketDeployment` (hashed assets cached for a year, `index.html` revalidated every load), and `A`/`AAAA` alias records for both names. |
 | `LedgerUiCiAccess` | ap-southeast-2 | The IAM role GitHub Actions deploys with (OIDC, `main` only; it can only assume CDK's bootstrap roles). Reuses the account's GitHub OIDC provider, which ledger-api's `LedgerApiCiAccess` owns. |
 
-The zone is imported by ID and never changed apart from this UI's records and ACM's validation record.
+The zone is imported by ID and never changed apart from this UI's records and ACM's validation records.
+
+`chace.haoran.cloud` (`redirectDomains` in `cdk.json`) redirects to `ledger.haoran.cloud`, keeping the path, rather than serving the app: Google signs users in through a redirect URI on `ledger.haoran.cloud`, and the sign-in cookie set before leaving only reaches the host that set it, so sign-in from another host would fail. A new name needs its `A` record free (CloudFormation won't take over a record it didn't create) and a new certificate, in a new stack: see the note in `infra/bin/app.ts`.
 
 ## First deploy (once, from your machine)
 

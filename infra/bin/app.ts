@@ -24,9 +24,10 @@ if (!existsSync(assetsPath)) {
 }
 
 // The certificate must come from us-east-1 for CloudFront, hence the second stack and
-// cross-region references.
+// cross-region references. A certificate can't change names in place: the reference's key stays
+// the same, so LedgerUi would never see the replacement's ARN. A new stack gets a new key.
 const domain: CustomDomain = context('customDomain')
-const { certificate } = new CertificateStack(app, 'LedgerUiCertificate', {
+const { certificate } = new CertificateStack(app, 'LedgerUiCertificates', {
   env: { ...env, region: 'us-east-1' },
   crossRegionReferences: true,
   domain,

@@ -11,13 +11,15 @@ import type { Construct } from 'constructs'
 export interface CustomDomain {
   /** e.g. ledger.haoran.cloud */
   domainName: string
+  /** Other names for the UI, which redirect to domainName. */
+  redirectDomains: string[]
   /** The existing zone, e.g. haoran.cloud. */
   zoneName: string
   hostedZoneId: string
 }
 
 /**
- * The TLS certificate for the UI's domain. CloudFront only accepts certificates from
+ * The TLS certificate for the UI's names. CloudFront only accepts certificates from
  * us-east-1, so this stack lives there while the UI's bucket stays in ap-southeast-2.
  */
 export class CertificateStack extends Stack {
@@ -29,7 +31,7 @@ export class CertificateStack extends Stack {
     props: StackProps & { domain: CustomDomain },
   ) {
     super(scope, id, props)
-    const { domainName, zoneName, hostedZoneId } = props.domain
+    const { domainName, redirectDomains, zoneName, hostedZoneId } = props.domain
     // Imported by ID rather than looked up: a lookup caches the account ID in cdk.context.json.
     const zone = HostedZone.fromHostedZoneAttributes(this, 'Zone', {
       zoneName,
@@ -38,6 +40,7 @@ export class CertificateStack extends Stack {
     // ACM adds and checks the validation record in the zone itself. Public certificates are free.
     this.certificate = new Certificate(this, 'UiCertificate', {
       domainName,
+      subjectAlternativeNames: redirectDomains,
       validation: CertificateValidation.fromDns(zone),
     })
   }

@@ -56,7 +56,7 @@ jobs:
           aws-region: ap-southeast-2
           # Also hides the account ID wherever later steps print it (e.g. ARNs in cdk output).
           mask-aws-account-id: true
-      # Deploys LedgerUiCertificate first when it has changed, since LedgerUi depends on it.
+      # Deploys LedgerUiCertificates first when it has changed, since LedgerUi depends on it.
       - name: Deploy
         run: npx cdk deploy LedgerUi --require-approval never --outputs-file cdk-outputs.json
       - name: Smoke test

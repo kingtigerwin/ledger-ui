@@ -3,6 +3,7 @@
   "context": {
     "customDomain": {
       "domainName": "ledger.haoran.cloud",
+      "redirectDomains": ["chace.haoran.cloud"],
       "zoneName": "haoran.cloud",
       "hostedZoneId": "Z5UXKBB5IU578"
     },
