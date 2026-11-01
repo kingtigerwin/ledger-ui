@@ -3,7 +3,14 @@ import { AppHeader } from '../components/AppHeader'
 import { AskBox } from '../components/AskBox'
 import { InsightCard } from '../components/InsightCard'
 import { SummaryCard } from '../components/SummaryCard'
-import { formatCents, greeting, localDate, localMonth } from '../format'
+import {
+  formatCents,
+  formatMonth,
+  greeting,
+  localDate,
+  localMonth,
+  previousMonth,
+} from '../format'
 import { useInsights, useMonthlySummary } from '../hooks/useHome'
 
 const ATTENTION_HEADING = 'Needs your attention'
@@ -11,6 +18,10 @@ const ATTENTION_HEADING = 'Needs your attention'
 function Spend({ month }: { month: string }) {
   const summary = useMonthlySummary(month)
   const [open, setOpen] = useState(false)
+  // Early in a month a bare $0.00 looks broken, so last month's total gives it context. It's only
+  // asked for then, so an ordinary load makes no extra request.
+  const nothingYet = summary.data?.totalCents === 0
+  const lastMonth = useMonthlySummary(previousMonth(month), nothingYet)
 
   return (
     <div className="min-w-0 flex-1">
@@ -28,6 +39,28 @@ function Spend({ month }: { month: string }) {
             Try again
           </button>
         </p>
+      ) : nothingYet ? (
+        <>
+          <p
+            data-testid="spend-total"
+            className="mt-1 text-3xl font-semibold tabular-nums"
+          >
+            {formatCents(0, summary.data.currency)}
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Nothing recorded yet this month
+            {!!lastMonth.data?.totalCents && (
+              <>
+                {' · '}
+                {formatMonth(lastMonth.data.month)}:{' '}
+                {formatCents(
+                  lastMonth.data.totalCents,
+                  lastMonth.data.currency,
+                )}
+              </>
+            )}
+          </p>
+        </>
       ) : (
         <>
           <button

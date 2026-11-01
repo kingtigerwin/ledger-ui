@@ -8,7 +8,7 @@ export const HOME_QUERY_KEY = ['home']
 // Reads are cheap but not free, and moving between tabs shouldn't repeat them.
 const STALE_TIME_MS = 5 * 60 * 1000
 
-export function useMonthlySummary(month: string) {
+export function useMonthlySummary(month: string, enabled = true) {
   const { authRequest } = useAuth()
   return useQuery({
     queryKey: [...HOME_QUERY_KEY, 'summary', month],
@@ -16,6 +16,7 @@ export function useMonthlySummary(month: string) {
       authRequest<MonthlySummary>(
         `/api/v1/transactions/summary?month=${month}`,
       ),
+    enabled,
     staleTime: STALE_TIME_MS,
   })
 }
