@@ -12,12 +12,10 @@ describe('given a visitor who is not signed in', () => {
     expect(screen.queryByLabelText(/describe your spending/i)).toBeNull()
   })
 
-  it('signs an active user in and opens the chat page', async () => {
+  it('signs an active user in and opens Home', async () => {
     const { user } = renderApp('/login')
     await signIn(user, 'alice', 'alice-password')
-    expect(
-      await screen.findByLabelText(/describe your spending/i),
-    ).toBeInTheDocument()
+    expect(await screen.findByLabelText(/ask ledger/i)).toBeInTheDocument()
   })
 
   it('returns them to the page they asked for after signing in', async () => {
@@ -86,15 +84,13 @@ describe('given the waiting page', () => {
     expect(screen.queryByRole('link', { name: /google/i })).toBeNull()
   })
 
-  it('sends someone already signed in to the chat', async () => {
+  it('sends someone already signed in to Home', async () => {
     const { user } = renderApp('/login')
     await signIn(user, 'alice', 'alice-password')
-    await screen.findByLabelText(/describe your spending/i)
+    await screen.findByLabelText(/ask ledger/i)
     cleanup()
     renderApp('/pending')
-    expect(
-      await screen.findByLabelText(/describe your spending/i),
-    ).toBeInTheDocument()
+    expect(await screen.findByLabelText(/ask ledger/i)).toBeInTheDocument()
   })
 })
 
@@ -162,7 +158,7 @@ describe('given a signed-in user', () => {
   it('stays signed in across a reload, using the refresh cookie', async () => {
     const first = renderApp('/login')
     await signIn(first.user, 'alice', 'alice-password')
-    await screen.findByLabelText(/describe your spending/i)
+    await screen.findByLabelText(/ask ledger/i)
 
     // A reload: a new app with no token in memory.
     document.body.innerHTML = ''
@@ -190,7 +186,7 @@ describe('given a signed-in user', () => {
   it('does not show the Users page to a customer', async () => {
     const { user } = renderApp('/login')
     await signIn(user, 'alice', 'alice-password')
-    await screen.findByLabelText(/describe your spending/i)
+    await screen.findByLabelText(/ask ledger/i)
     expect(screen.queryByRole('link', { name: /users/i })).toBeNull()
 
     endSession()
@@ -202,15 +198,13 @@ describe('given a signed-in user', () => {
     ).toBeInTheDocument()
   })
 
-  it('sends a customer who opens /admin to the chat', async () => {
+  it('sends a customer who opens /admin to Home', async () => {
     const { user } = renderApp('/login')
     await signIn(user, 'alice', 'alice-password')
-    await screen.findByLabelText(/describe your spending/i)
+    await screen.findByLabelText(/ask ledger/i)
 
     document.body.innerHTML = ''
     renderApp('/admin')
-    expect(
-      await screen.findByLabelText(/describe your spending/i),
-    ).toBeInTheDocument()
+    expect(await screen.findByLabelText(/ask ledger/i)).toBeInTheDocument()
   })
 })

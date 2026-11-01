@@ -45,6 +45,41 @@ export interface MonthlySummary {
   byCategory: { category: string; totalCents: number }[]
 }
 
+interface InsightBase {
+  /** What `POST /api/v1/insights/{id}/dismiss` takes. */
+  id: string
+  currency: string
+  /** The transactions behind it, newest first for a price rise. */
+  transactions: Transaction[]
+}
+
+export interface PossibleDuplicate extends InsightBase {
+  type: 'possible_duplicate'
+  merchant: string
+  amountCents: number
+}
+
+export interface PriceRise extends InsightBase {
+  type: 'price_rise'
+  merchant: string
+  previousCents: number
+  currentCents: number
+  /** The first charge at the new price. */
+  since: string
+  cadence: 'monthly' | 'yearly'
+  extraPerYearCents: number
+}
+
+export interface RegoDue extends InsightBase {
+  type: 'rego_due'
+  /** ledger-api estimates this from the last payment, so the UI says "around". */
+  estimatedDueDate: string
+  lastPaidCents: number
+}
+
+/** An item of `GET /api/v1/insights`. The UI writes the wording; only stored text isn't English. */
+export type Insight = PossibleDuplicate | PriceRise | RegoDue
+
 export interface ChatTurn {
   role: 'user' | 'assistant'
   content: string

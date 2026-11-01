@@ -3,7 +3,7 @@ import { EXAMPLE_PROMPTS } from '../constants'
 import { AppHeader } from '../components/AppHeader'
 import { ChatInput } from '../components/ChatInput'
 import { MessageList } from '../components/MessageList'
-import { useChat } from '../hooks/useChat'
+import { useChat } from '../chat/useChat'
 
 export function ChatPage() {
   const { messages, isThinking, send, retry, reset } = useChat()

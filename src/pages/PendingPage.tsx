@@ -10,7 +10,7 @@ import { AuthCard, primaryButtonClass } from '../components/AuthCard'
 export function PendingPage() {
   const { state } = useAuth()
 
-  if (state.status === 'signedIn') return <Navigate to="/chat" replace />
+  if (state.status === 'signedIn') return <Navigate to="/" replace />
 
   return (
     <AuthCard title="Thanks, you're nearly in">

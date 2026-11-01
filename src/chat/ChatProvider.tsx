@@ -1,9 +1,12 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { ApiError } from '../api/client'
 import type { ChatResponse, ChatTurn } from '../api/types'
 import { useAuth } from '../auth/useAuth'
+import { HOME_QUERY_KEY } from '../hooks/useHome'
 import type { ChatMessage } from '../types'
+import { ChatContext } from './context'
 
 // ledger-agent accepts at most 20 messages per request.
 const MAX_HISTORY = 20
@@ -30,8 +33,13 @@ function toHistory(messages: ChatMessage[]): ChatTurn[] {
   return turns
 }
 
-export function useChat() {
+/**
+ * Holds the conversation above the pages, so it survives moving between tabs. It sits inside
+ * `RequireAuth`: signing out unmounts it, so the next person on this browser starts with nothing.
+ */
+export function ChatProvider({ children }: { children: ReactNode }) {
   const { authRequest } = useAuth()
+  const queryClient = useQueryClient()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const mutation = useMutation({
     mutationFn: (history: ChatTurn[]) =>
@@ -46,7 +54,7 @@ export function useChat() {
 
   const submit = (history: ChatMessage[], userMessageId: string) => {
     mutation.mutate(toHistory(history), {
-      onSuccess: (response) =>
+      onSuccess: (response) => {
         setMessages((prev) => [
           ...prev,
           createMessage({
@@ -56,7 +64,11 @@ export function useChat() {
             listed: response.listed,
             summaries: response.summaries,
           }),
-        ]),
+        ])
+        if (response.transactions.length > 0) {
+          queryClient.invalidateQueries({ queryKey: HOME_QUERY_KEY })
+        }
+      },
       onError: (error) =>
         setMessages((prev) => [
           ...prev,
@@ -94,5 +106,17 @@ export function useChat() {
     setMessages([])
   }
 
-  return { messages, isThinking: mutation.isPending, send, retry, reset }
+  return (
+    <ChatContext
+      value={{
+        messages,
+        isThinking: mutation.isPending,
+        send,
+        retry,
+        reset,
+      }}
+    >
+      {children}
+    </ChatContext>
+  )
 }

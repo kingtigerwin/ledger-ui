@@ -5,7 +5,7 @@ import { useAuth } from './useAuth'
 
 interface RequireAuthProps {
   children: ReactNode
-  /** Only users with this role get in; others go to the chat. */
+  /** Only users with this role get in; others go to Home. */
   role?: Role
 }
 
@@ -24,6 +24,6 @@ export function RequireAuth({ children, role }: RequireAuthProps) {
   if (state.status === 'signedOut') {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
-  if (role && state.user.role !== role) return <Navigate to="/chat" replace />
+  if (role && state.user.role !== role) return <Navigate to="/" replace />
   return children
 }

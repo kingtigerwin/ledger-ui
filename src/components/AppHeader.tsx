@@ -15,6 +15,9 @@ export function AppHeader({ actions }: { actions?: ReactNode }) {
       <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-2 px-4 py-3">
         <span className="mr-2 text-lg font-semibold">Ledger</span>
         <nav className="flex gap-1">
+          <NavLink to="/" end className={navClass}>
+            Home
+          </NavLink>
           <NavLink to="/chat" className={navClass}>
             Chat
           </NavLink>
