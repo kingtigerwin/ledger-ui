@@ -2,7 +2,9 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { findTransactions, seedReceiptReply } from '../mocks/handlers'
-import { flybuysReceipt, readReply } from '../mocks/receipts'
+import type { ReadReply } from '../api/types'
+import { localDate } from '../format'
+import { billReply, flybuysReceipt, readReply } from '../mocks/receipts'
 import { server } from '../mocks/server'
 import { renderApp, signIn } from '../test/renderApp'
 import { shrinkImage } from '../receipts/shrinkImage'
@@ -25,7 +27,7 @@ async function openHome() {
   return app
 }
 
-async function scan(reply = readReply()) {
+async function scan(reply: ReadReply = readReply()) {
   seedReceiptReply(reply)
   const app = await openHome()
   await app.user.upload(screen.getByLabelText('Upload photo'), photo)
@@ -173,6 +175,101 @@ describe('given a receipt that fails a check', () => {
     if (text) await user.type(amount, text)
 
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+})
+
+describe('given a bill', () => {
+  it('says it is a bill and asks whether it has been paid, recording nothing yet', async () => {
+    await scan(billReply())
+
+    const question = await screen.findByRole('group', { name: /bill/i })
+    expect(question).toHaveTextContent(
+      'This is a bill from Whitehorse City Council for council rates: $583.00, due 30 Nov 2026.',
+    )
+    expect(question).toHaveTextContent('Have you paid it?')
+    expect(
+      within(question).getByRole('button', { name: 'Yes' }),
+    ).toBeInTheDocument()
+    expect(
+      within(question).getByRole('button', { name: 'No' }),
+    ).toBeInTheDocument()
+    expect(saved()).toHaveLength(0)
+  })
+
+  it('records it as paid today on Yes', async () => {
+    const { user } = await scan(billReply())
+
+    await user.click(await screen.findByRole('button', { name: 'Yes' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Recorded $583.00 at Whitehorse City Council',
+    )
+    expect(saved()).toHaveLength(1)
+    expect(saved()[0]).toMatchObject({
+      date: localDate(new Date()),
+      merchant: 'Whitehorse City Council',
+      item: 'council rates',
+      category: 'utilities',
+      amountCents: 58300,
+      note: 'Bill due 30 Nov 2026',
+    })
+    expect(saved()[0].receipt).toBeUndefined()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+  })
+
+  it('records nothing on No', async () => {
+    const { user } = await scan(billReply())
+
+    await user.click(await screen.findByRole('button', { name: 'No' }))
+
+    expect(screen.queryByRole('group', { name: /bill/i })).toBeNull()
+    expect(saved()).toHaveLength(0)
+  })
+
+  it('still asks about a bill with only an amount', async () => {
+    const { user } = await scan(
+      billReply({ biller: null, item: null, dueDate: null }),
+    )
+
+    expect(
+      await screen.findByRole('group', { name: /bill/i }),
+    ).toHaveTextContent('This is a bill for $583.00.')
+    await user.click(screen.getByRole('button', { name: 'Yes' }))
+
+    await waitFor(() => expect(saved()).toHaveLength(1))
+    expect(saved()[0]).toMatchObject({ item: 'Bill', amountCents: 58300 })
+    expect(saved()[0].merchant).toBeUndefined()
+    expect(saved()[0].note).toBeUndefined()
+  })
+
+  it('offers Yes again with the same id when saving fails, so it cannot record twice', async () => {
+    const ids: string[] = []
+    let failed = false
+    server.events.on('request:start', async ({ request }) => {
+      if (request.method === 'POST' && request.url.endsWith('/transactions')) {
+        ids.push(((await request.clone().json()) as { id: string }).id)
+      }
+    })
+    server.use(
+      http.post('*/api/v1/transactions', () => {
+        if (failed) return undefined
+        failed = true
+        return HttpResponse.json(
+          { error: { code: 'x', message: 'Could not save' } },
+          { status: 500 },
+        )
+      }),
+    )
+    const { user } = await scan(billReply())
+
+    await user.click(await screen.findByRole('button', { name: 'Yes' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save')
+    await user.click(screen.getByRole('button', { name: 'Yes' }))
+
+    await waitFor(() => expect(saved()).toHaveLength(1))
+    server.events.removeAllListeners()
+    expect(new Set(ids).size).toBe(1)
+    expect(ids).toHaveLength(2)
   })
 })
 

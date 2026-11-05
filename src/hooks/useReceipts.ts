@@ -2,15 +2,20 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import type {
   NewTransaction,
+  ReadBill,
   ReadReceipt,
-  ReadReceiptResponse,
+  ReadReply,
   ReceiptProblem,
   Transaction,
 } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import { localDate } from '../format'
 import { shrinkImage } from '../receipts/shrinkImage'
-import { toNewTransaction, type ReceiptEntry } from '../receipts/toTransaction'
+import {
+  billToNewTransaction,
+  toNewTransaction,
+  type ReceiptEntry,
+} from '../receipts/toTransaction'
 import { newUlid } from '../ulid'
 import { HOME_QUERY_KEY } from './useHome'
 
@@ -28,6 +33,8 @@ export type Stage =
       alreadyRecorded: boolean
       saveError?: string
     }
+  /** Nothing is saved unless the customer says they've paid it; `id` works as it does for a review. */
+  | { name: 'bill'; bill: ReadBill; id: string; saveError?: string }
   | { name: 'recorded'; transaction: Transaction }
   | { name: 'editing'; transaction: Transaction; saveError?: string }
 
@@ -87,20 +94,21 @@ export function useReceipts() {
       return
     }
     const id = newUlid()
-    let reply: ReadReceiptResponse
+    let reply: ReadReply
     let alreadyRecorded = false
     try {
-      reply = await authRequest<ReadReceiptResponse>(
-        '/agent/v1/receipts/read',
-        {
-          method: 'POST',
-          body: {
-            image: image.base64,
-            mediaType: image.mediaType,
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          },
+      reply = await authRequest<ReadReply>('/agent/v1/receipts/read', {
+        method: 'POST',
+        body: {
+          image: image.base64,
+          mediaType: image.mediaType,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
-      )
+      })
+      if (reply.kind === 'bill') {
+        setStage({ name: 'bill', bill: reply.bill, id })
+        return
+      }
       if (reply.problems.includes('nothing_paid')) {
         setStage({
           name: 'failed',
@@ -142,6 +150,17 @@ export function useReceipts() {
     if (stage.name !== 'review') return
     try {
       await post(toNewTransaction(stage.receipt, entry, stage.id))
+    } catch (err) {
+      setStage({ ...stage, saveError: errorMessage(err) })
+    }
+  }
+
+  const payBill = async () => {
+    if (stage.name !== 'bill') return
+    try {
+      await post(
+        billToNewTransaction(stage.bill, stage.id, localDate(new Date())),
+      )
     } catch (err) {
       setStage({ ...stage, saveError: errorMessage(err) })
     }
@@ -192,5 +211,15 @@ export function useReceipts() {
 
   const close = () => setStage({ name: 'idle' })
 
-  return { stage, scan, saveReview, saveEdit, undo, edit, cancelEdit, close }
+  return {
+    stage,
+    scan,
+    saveReview,
+    payBill,
+    saveEdit,
+    undo,
+    edit,
+    cancelEdit,
+    close,
+  }
 }

@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
-import type { ReceiptProblem, Transaction } from '../api/types'
+import type { ReadBill, ReceiptProblem, Transaction } from '../api/types'
 import { CATEGORIES } from '../constants'
-import { formatCents } from '../format'
+import { formatCents, formatDate } from '../format'
 import { useReceipts } from '../hooks/useReceipts'
 import type { ReceiptEntry } from '../receipts/toTransaction'
 import { ReceiptItems } from './ReceiptItems'
@@ -22,6 +22,8 @@ const ALREADY_RECORDED =
 
 const quietButtonClass =
   'rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50'
+const primaryButtonClass =
+  'rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300'
 const fieldClass =
   'mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
 
@@ -124,12 +126,61 @@ function ReceiptForm({
         <button
           type="submit"
           disabled={!canSave}
-          className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className={primaryButtonClass}
         >
           Save
         </button>
       </div>
     </form>
+  )
+}
+
+/** "This is a bill from Whitehorse City Council for council rates: $583.00, due 30 Nov 2026." */
+function describeBill({ biller, item, amountCents, dueDate }: ReadBill) {
+  const amount = `${formatCents(amountCents)}${dueDate ? `, due ${formatDate(dueDate)}` : ''}`
+  const what = [biller && `from ${biller}`, item && `for ${item}`]
+    .filter(Boolean)
+    .join(' ')
+  return what
+    ? `This is a bill ${what}: ${amount}.`
+    : `This is a bill for ${amount}.`
+}
+
+function BillQuestion({
+  bill,
+  saveError,
+  onYes,
+  onNo,
+}: {
+  bill: ReadBill
+  saveError?: string
+  onYes: () => void
+  onNo: () => void
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Bill"
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+    >
+      <p className="text-sm text-slate-700">{describeBill(bill)}</p>
+      <p className="mt-1 text-sm font-medium text-slate-900">
+        Have you paid it?
+      </p>
+      {saveError && (
+        <p role="alert" className="mt-2 text-sm text-red-700">
+          {saveError}
+        </p>
+      )}
+      <div className="mt-3 flex justify-end gap-2">
+        <button type="button" onClick={onNo} className={quietButtonClass}>
+          No
+        </button>
+        <button type="button" onClick={onYes} className={primaryButtonClass}>
+          Yes
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -173,8 +224,17 @@ function Recorded({
 }
 
 export function ReceiptScanner() {
-  const { stage, scan, saveReview, saveEdit, undo, edit, cancelEdit, close } =
-    useReceipts()
+  const {
+    stage,
+    scan,
+    saveReview,
+    payBill,
+    saveEdit,
+    undo,
+    edit,
+    cancelEdit,
+    close,
+  } = useReceipts()
   const busy = stage.name === 'reading'
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -220,6 +280,14 @@ export function ReceiptScanner() {
         <p role="alert" className="text-sm text-red-700">
           {stage.message}
         </p>
+      )}
+      {stage.name === 'bill' && (
+        <BillQuestion
+          bill={stage.bill}
+          saveError={stage.saveError}
+          onYes={payBill}
+          onNo={close}
+        />
       )}
       {stage.name === 'recorded' && (
         <Recorded transaction={stage.transaction} onUndo={undo} onEdit={edit} />

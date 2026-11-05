@@ -75,7 +75,7 @@ export interface ReceiptDetails {
 export interface NewTransaction {
   id: string
   date: string
-  merchant: string
+  merchant?: string
   category: string
   item: string
   amountCents: number
@@ -111,11 +111,29 @@ export interface ReadReceipt {
 }
 
 export interface ReadReceiptResponse {
+  kind: 'receipt'
   receipt: ReadReceipt
   /** Why a person should look first; empty when the checks passed. */
   problems: ReceiptProblem[]
   canRecord: boolean
 }
+
+/** `bill` of `POST /agent/v1/receipts/read`. A bill doesn't show it was paid, so the customer is asked. */
+export interface ReadBill {
+  biller: string | null
+  /** What it's for, in plain words, e.g. "council rates". */
+  item: string | null
+  category: string
+  amountCents: number
+  dueDate: string | null
+}
+
+export interface ReadBillResponse {
+  kind: 'bill'
+  bill: ReadBill
+}
+
+export type ReadReply = ReadReceiptResponse | ReadBillResponse
 
 export interface MonthlySummary {
   /** e.g. 2026-10 */

@@ -1,4 +1,9 @@
-import type { ReadReceipt, ReadReceiptResponse } from '../api/types'
+import type {
+  ReadBill,
+  ReadBillResponse,
+  ReadReceipt,
+  ReadReceiptResponse,
+} from '../api/types'
 
 export const flybuysReceipt: ReadReceipt = {
   merchant: 'Coles',
@@ -42,8 +47,22 @@ export const oneLineReceipt: ReadReceipt = {
 export const readReply = (
   fields: Partial<ReadReceiptResponse> = {},
 ): ReadReceiptResponse => ({
+  kind: 'receipt',
   receipt: flybuysReceipt,
   problems: [],
   canRecord: true,
   ...fields,
+})
+
+export const ratesBill: ReadBill = {
+  biller: 'Whitehorse City Council',
+  item: 'council rates',
+  category: 'utilities',
+  amountCents: 58300,
+  dueDate: '2026-11-30',
+}
+
+export const billReply = (bill: Partial<ReadBill> = {}): ReadBillResponse => ({
+  kind: 'bill',
+  bill: { ...ratesBill, ...bill },
 })
