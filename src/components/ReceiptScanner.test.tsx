@@ -30,7 +30,7 @@ async function openHome() {
 async function scan(reply: ReadReply = readReply()) {
   seedReceiptReply(reply)
   const app = await openHome()
-  await app.user.upload(screen.getByLabelText('Upload photo'), photo)
+  await app.user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
   return app
 }
 
@@ -48,15 +48,21 @@ describe('given the buttons on Home', () => {
       'capture',
       'environment',
     )
-    expect(screen.getByLabelText('Upload photo')).not.toHaveAttribute('capture')
+    expect(screen.getByLabelText('Upload photo or PDF')).not.toHaveAttribute(
+      'capture',
+    )
   })
 
-  it('takes images only', async () => {
+  it('takes photos from the camera, and photos or PDFs from files', async () => {
     await openHome()
 
-    expect(screen.getByLabelText('Upload photo')).toHaveAttribute(
+    expect(screen.getByLabelText('Take photo')).toHaveAttribute(
       'accept',
       'image/*',
+    )
+    expect(screen.getByLabelText('Upload photo or PDF')).toHaveAttribute(
+      'accept',
+      'image/*,application/pdf',
     )
   })
 })
@@ -293,7 +299,7 @@ describe('given a receipt already in the ledger', () => {
   it('asks first, when the receipt number matches', async () => {
     const { user } = await scan()
     await screen.findByRole('status')
-    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /already recorded/i,
@@ -304,7 +310,7 @@ describe('given a receipt already in the ledger', () => {
   it('still lets the customer save it', async () => {
     const { user } = await scan()
     await screen.findByRole('status')
-    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
 
     await user.click(await screen.findByRole('button', { name: 'Save' }))
 
@@ -322,7 +328,7 @@ describe('given a receipt already in the ledger', () => {
     await user.click(screen.getByRole('link', { name: 'Home' }))
     await screen.findByRole('heading', { name: /^good/i })
 
-    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /already recorded/i,
@@ -335,6 +341,8 @@ describe('given the agent refuses', () => {
     ['not_a_receipt', "That doesn't look like a receipt."],
     ['unreadable', "That receipt couldn't be read."],
     ['daily_receipt_limit_reached', "You've scanned today's 10 receipts."],
+    ['too_many_pages', 'That PDF has more than 5 pages.'],
+    ['pdf_unreadable', "That PDF couldn't be opened."],
   ])('shows its message for %s', async (code, message) => {
     server.use(
       http.post('*/agent/v1/receipts/read', () =>
@@ -343,10 +351,57 @@ describe('given the agent refuses', () => {
     )
     const { user } = await openHome()
 
-    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
     expect(saved()).toHaveLength(0)
+  })
+})
+
+describe('given a PDF', () => {
+  const pdfText = '%PDF-1.7 a bill'
+  const pdf = new File([pdfText], 'bill.pdf', { type: 'application/pdf' })
+
+  it('sends it as it is, without shrinking it', async () => {
+    let sent: { image: string; mediaType: string } | undefined
+    server.events.on('request:start', async ({ request }) => {
+      if (request.url.endsWith('/agent/v1/receipts/read')) {
+        sent = await request.clone().json()
+      }
+    })
+    seedReceiptReply(billReply())
+    const { user } = await openHome()
+
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), pdf)
+
+    await screen.findByRole('group', { name: /bill/i })
+    server.events.removeAllListeners()
+    expect(sent).toMatchObject({
+      image: btoa(pdfText),
+      mediaType: 'application/pdf',
+    })
+    expect(shrinkImage).not.toHaveBeenCalled()
+  })
+
+  it('refuses one over 3 MB before uploading it', async () => {
+    const uploads: string[] = []
+    server.events.on('request:start', ({ request }) => {
+      if (request.url.endsWith('/agent/v1/receipts/read')) {
+        uploads.push(request.url)
+      }
+    })
+    const big = new File(['x'.repeat(3_100_000)], 'statement.pdf', {
+      type: 'application/pdf',
+    })
+    const { user } = await openHome()
+
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), big)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /PDF is too large/i,
+    )
+    server.events.removeAllListeners()
+    expect(uploads).toHaveLength(0)
   })
 })
 
@@ -355,7 +410,7 @@ describe('given a photo the browser cannot open', () => {
     vi.mocked(shrinkImage).mockRejectedValueOnce(new Error('no'))
     const { user } = await openHome()
 
-    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/jpeg or png/i)
   })
@@ -408,7 +463,7 @@ describe('given a scan is running', () => {
     const finish = holdTheReply()
     const { user } = await openHome()
 
-    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
 
     const modal = await screen.findByRole('dialog', { hidden: true })
     expect(modal).toHaveTextContent('Your receipt is uploading, please wait')
@@ -423,10 +478,10 @@ describe('given a scan is running', () => {
     const finish = holdTheReply()
     const { user } = await openHome()
 
-    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
 
     await screen.findByRole('dialog', { hidden: true })
-    expect(screen.getByLabelText('Upload photo')).toBeDisabled()
+    expect(screen.getByLabelText('Upload photo or PDF')).toBeDisabled()
     expect(screen.getByLabelText('Take photo')).toBeDisabled()
     await waitFor(() => finish())
     await screen.findByRole('status')
@@ -435,7 +490,7 @@ describe('given a scan is running', () => {
   it('cannot be closed with Escape', async () => {
     const finish = holdTheReply()
     const { user } = await openHome()
-    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
     const modal = await screen.findByRole('dialog', { hidden: true })
 
     const escape = new Event('cancel', { cancelable: true })
@@ -457,7 +512,7 @@ describe('given a scan is running', () => {
     )
     const { user } = await openHome()
 
-    await user.upload(screen.getByLabelText('Upload photo'), photo)
+    await user.upload(screen.getByLabelText('Upload photo or PDF'), photo)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('clearer photo')
     expect(screen.queryByRole('dialog', { hidden: true })).toBeNull()

@@ -261,10 +261,10 @@ export function ReceiptScanner() {
           />
         </label>
         <label className={photoButtonClass}>
-          Upload photo
+          Upload photo or PDF
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             disabled={busy}
             onChange={handleFile}
             className="sr-only"
