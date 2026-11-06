@@ -140,7 +140,8 @@ export interface MonthlySummary {
   month: string
   currency: string
   totalCents: number
-  byCategory: { category: string; totalCents: number }[]
+  /** `count` is how many transactions make up the total; older ledger-apis leave it out. */
+  byCategory: { category: string; totalCents: number; count?: number }[]
 }
 
 interface InsightBase {
