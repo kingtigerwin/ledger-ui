@@ -66,10 +66,14 @@ export function resetMockDb() {
 }
 
 /** Records an expense for `username`, as if they had told the agent about it. */
-export function seedTransaction(username: string, amountCents: number) {
+export function seedTransaction(
+  username: string,
+  amountCents: number,
+  fields: Partial<Transaction> = {},
+) {
   const user = findUser(username)
   if (!user) throw new Error(`No mock user ${username}`)
-  db.transactions.push(newTransaction(user.id, amountCents))
+  db.transactions.push({ ...newTransaction(user.id, amountCents), ...fields })
 }
 
 /** What the agent reads the next photos as. */
@@ -187,22 +191,29 @@ const withAdmin = (handler: (info: ResolverInfo) => ReturnType<Resolver>) =>
   )
 
 function monthlySummary(user: MockUser, month: string) {
-  const byCategory = new Map<string, number>()
+  const byCategory = new Map<
+    string,
+    { category: string; totalCents: number; count: number }
+  >()
   for (const t of db.transactions) {
     if (t.userId !== user.id) continue
-    byCategory.set(
-      t.category,
-      (byCategory.get(t.category) ?? 0) + t.amountCents,
-    )
+    const entry = byCategory.get(t.category) ?? {
+      category: t.category,
+      totalCents: 0,
+      count: 0,
+    }
+    entry.totalCents += t.amountCents
+    entry.count += 1
+    byCategory.set(t.category, entry)
   }
+  const categories = [...byCategory.values()].sort(
+    (a, b) => b.totalCents - a.totalCents,
+  )
   return {
     month,
     currency: 'AUD',
-    totalCents: [...byCategory.values()].reduce((sum, n) => sum + n, 0),
-    byCategory: [...byCategory].map(([category, totalCents]) => ({
-      category,
-      totalCents,
-    })),
+    totalCents: categories.reduce((sum, c) => sum + c.totalCents, 0),
+    byCategory: categories,
   }
 }
 
@@ -394,9 +405,12 @@ export const handlers = [
         .filter(
           (t) =>
             t.userId === user.id &&
+            (!query.get('category') || t.category === query.get('category')) &&
             t.date >= (query.get('from') ?? '') &&
             t.date <= (query.get('to') ?? '9999'),
         )
+        // Newest first, as ledger-api lists them.
+        .sort((a, b) => b.date.localeCompare(a.date))
         .map(withoutOwner)
       return HttpResponse.json({ items, nextCursor: null })
     }),

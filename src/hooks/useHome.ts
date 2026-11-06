@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Insight, MonthlySummary } from '../api/types'
+import type { Insight, MonthlySummary, Transaction } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 
 /** Everything Home shows; recording or deleting a transaction refreshes all of it. */
@@ -17,6 +17,35 @@ export function useMonthlySummary(month: string, enabled = true) {
         `/api/v1/transactions/summary?month=${month}`,
       ),
     enabled,
+    staleTime: STALE_TIME_MS,
+  })
+}
+
+/** One category's transactions in a month, newest first: every page, since a month's are few. */
+export function useCategoryTransactions(month: string, category: string) {
+  const { authRequest } = useAuth()
+  return useQuery({
+    queryKey: [...HOME_QUERY_KEY, 'category', month, category],
+    queryFn: async () => {
+      const [year, monthNumber] = month.split('-').map(Number)
+      const lastDay = new Date(year, monthNumber, 0).getDate()
+      const items: Transaction[] = []
+      let cursor: string | null = null
+      do {
+        const query = new URLSearchParams({
+          category,
+          from: `${month}-01`,
+          to: `${month}-${lastDay}`,
+          limit: '100',
+          ...(cursor && { cursor }),
+        })
+        const page: { items: Transaction[]; nextCursor: string | null } =
+          await authRequest(`/api/v1/transactions?${query}`)
+        items.push(...page.items)
+        cursor = page.nextCursor
+      } while (cursor)
+      return items
+    },
     staleTime: STALE_TIME_MS,
   })
 }

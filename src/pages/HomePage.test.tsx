@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { localMonth } from '../format'
+import { formatDate, localMonth } from '../format'
 import { seedInsight, seedTransaction } from '../mocks/handlers'
 import { possibleDuplicate, priceRise, regoDue } from '../mocks/insights'
 import { server } from '../mocks/server'
@@ -53,6 +53,138 @@ describe('given alice on the Home page', () => {
       await user.click(total)
 
       expect(screen.getByTestId('summary-total')).toHaveTextContent('$123.45')
+    })
+
+    describe('given spending in several categories', () => {
+      const month = localMonth(new Date())
+      const lastDay = new Date(
+        Number(month.slice(0, 4)),
+        Number(month.slice(5)),
+        0,
+      ).getDate()
+
+      function seedMonth() {
+        seedTransaction('alice', 58300, {
+          date: `${month}-01`,
+          category: 'utilities',
+          item: 'council rates',
+          merchant: 'Whitehorse City Council',
+        })
+        seedTransaction('alice', 1, {
+          date: `${month}-02`,
+          category: 'utilities',
+          item: 'test',
+        })
+        seedTransaction('alice', 41699, {
+          date: `${month}-03`,
+          category: 'dining',
+          item: 'dinner',
+          merchant: 'Nando’s',
+        })
+      }
+
+      async function openCategories() {
+        seedMonth()
+        const app = await openHome()
+        await app.user.click(
+          await screen.findByRole('button', { name: /\$1,000\.00/ }),
+        )
+        return app
+      }
+
+      it('says how many items make up each one, and its share of the month', async () => {
+        await openCategories()
+
+        expect(
+          screen.getByRole('button', { name: /utilities/i }),
+        ).toHaveTextContent('Utilities$583.012 items · 58%')
+        expect(
+          screen.getByRole('button', { name: /dining/i }),
+        ).toHaveTextContent('Dining$416.991 item · 42%')
+      })
+
+      it('lists what is in a category when it is opened', async () => {
+        const { user } = await openCategories()
+
+        await user.click(screen.getByRole('button', { name: /utilities/i }))
+
+        const list = await screen.findByRole('list', {
+          name: 'Utilities transactions',
+        })
+        expect(
+          within(list)
+            .getAllByRole('listitem')
+            .map((row) => row.textContent),
+        ).toEqual([
+          `test${formatDate(`${month}-02`)}$0.01`,
+          `council ratesWhitehorse City Council · ${formatDate(`${month}-01`)}$583.00`,
+        ])
+      })
+
+      it('shows one category at a time, and closes it on a second tap', async () => {
+        const { user } = await openCategories()
+        const utilities = screen.getByRole('button', { name: /utilities/i })
+
+        await user.click(utilities)
+        await screen.findByRole('list', { name: 'Utilities transactions' })
+        await user.click(screen.getByRole('button', { name: /dining/i }))
+
+        expect(
+          await screen.findByRole('list', { name: 'Dining transactions' }),
+        ).toHaveTextContent('dinner')
+        expect(
+          screen.queryByRole('list', { name: 'Utilities transactions' }),
+        ).toBeNull()
+        expect(utilities).toHaveAttribute('aria-expanded', 'false')
+
+        await user.click(screen.getByRole('button', { name: /dining/i }))
+        expect(
+          screen.queryByRole('list', { name: 'Dining transactions' }),
+        ).toBeNull()
+      })
+
+      it('asks for only that category, over the whole month', async () => {
+        const urls: string[] = []
+        server.events.on('request:start', ({ request }) => {
+          urls.push(request.url)
+        })
+        const { user } = await openCategories()
+
+        await user.click(screen.getByRole('button', { name: /utilities/i }))
+        await screen.findByRole('list', { name: 'Utilities transactions' })
+        server.events.removeAllListeners()
+
+        const list = urls
+          .map((url) => new URL(url))
+          .find((url) => url.pathname === '/api/v1/transactions')
+        expect(Object.fromEntries(list?.searchParams ?? [])).toMatchObject({
+          category: 'utilities',
+          from: `${month}-01`,
+          to: `${month}-${lastDay}`,
+        })
+      })
+
+      it('leaves out the count when ledger-api does not send one', async () => {
+        server.use(
+          http.get('*/api/v1/transactions/summary', () =>
+            HttpResponse.json({
+              month,
+              currency: 'AUD',
+              totalCents: 1000,
+              byCategory: [{ category: 'dining', totalCents: 1000 }],
+            }),
+          ),
+        )
+        const { user } = await openHome()
+
+        await user.click(
+          await screen.findByRole('button', { name: /\$10\.00/ }),
+        )
+
+        expect(
+          screen.getByRole('button', { name: /dining/i }),
+        ).toHaveTextContent('Dining$10.00100%')
+      })
     })
 
     it("doesn't count anyone else's spending", async () => {
