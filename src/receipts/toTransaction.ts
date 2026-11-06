@@ -1,5 +1,10 @@
-import type { NewTransaction, ReadReceipt, ReceiptDetails } from '../api/types'
-import { formatCents } from '../format'
+import type {
+  NewTransaction,
+  ReadBill,
+  ReadReceipt,
+  ReceiptDetails,
+} from '../api/types'
+import { formatCents, formatDate } from '../format'
 
 /** The fields a customer can correct. */
 export interface ReceiptEntry {
@@ -55,5 +60,23 @@ export function toNewTransaction(
     currency,
     receipt: detailsOf(receipt),
     ...(note && { note }),
+  }
+}
+
+/** A bill the customer says they've paid, dated the day they say so: the bill can't say when it was paid. */
+export function billToNewTransaction(
+  bill: ReadBill,
+  id: string,
+  date: string,
+): NewTransaction {
+  return {
+    id,
+    date,
+    category: bill.category,
+    item: bill.item ?? 'Bill',
+    amountCents: bill.amountCents,
+    currency: 'AUD',
+    ...(bill.biller && { merchant: bill.biller }),
+    ...(bill.dueDate && { note: `Bill due ${formatDate(bill.dueDate)}` }),
   }
 }

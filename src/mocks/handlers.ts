@@ -6,7 +6,7 @@ import type {
   ChatResponse,
   Insight,
   NewTransaction,
-  ReadReceiptResponse,
+  ReadReply,
   Transaction,
   UserStatus,
 } from '../api/types'
@@ -27,7 +27,7 @@ const db = {
   tokenGeneration: 0,
   transactions: [] as MockTransaction[],
   insights: new Map<string, Insight[]>(),
-  receiptReply: readReply(),
+  receiptReply: readReply() as ReadReply,
 }
 
 let nextId = 1
@@ -73,7 +73,7 @@ export function seedTransaction(username: string, amountCents: number) {
 }
 
 /** What the agent reads the next photos as. */
-export function seedReceiptReply(reply: ReadReceiptResponse) {
+export function seedReceiptReply(reply: ReadReply) {
   db.receiptReply = reply
 }
 
