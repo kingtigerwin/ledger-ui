@@ -10,12 +10,12 @@ import type {
 } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import { localDate } from '../format'
-import { shrinkImage } from '../receipts/shrinkImage'
 import {
   billToNewTransaction,
   toNewTransaction,
   type ReceiptEntry,
 } from '../receipts/toTransaction'
+import { PdfTooLargeError, toUpload } from '../receipts/toUpload'
 import { newUlid } from '../ulid'
 import { HOME_QUERY_KEY } from './useHome'
 
@@ -84,12 +84,14 @@ export function useReceipts() {
     setStage({ name: 'reading' })
     let image
     try {
-      image = await shrinkImage(file)
-    } catch {
+      image = await toUpload(file)
+    } catch (err) {
       setStage({
         name: 'failed',
         message:
-          "Ledger couldn't open that photo. Please try a JPEG or PNG image.",
+          err instanceof PdfTooLargeError
+            ? 'That PDF is too large (over 3 MB). Try a smaller one, or a screenshot of the bill or receipt.'
+            : "Ledger couldn't open that photo. Please try a JPEG or PNG image, or a PDF.",
       })
       return
     }
