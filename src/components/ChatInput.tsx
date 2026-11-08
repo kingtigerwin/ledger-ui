@@ -1,5 +1,10 @@
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from 'react'
-import { DAILY_MESSAGE_LIMIT } from '../constants'
+import { useAuth } from '../auth/useAuth'
+import {
+  DAILY_MESSAGE_LIMIT,
+  HIGHER_LIMIT_USERNAME,
+  HIGHER_MESSAGE_LIMIT,
+} from '../constants'
 import { useI18n } from '../i18n/useI18n'
 
 interface ChatInputProps {
@@ -17,6 +22,11 @@ export function ChatInput({
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { t } = useI18n()
+  const { state } = useAuth()
+  const dailyLimit =
+    state.status === 'signedIn' && state.user.username === HIGHER_LIMIT_USERNAME
+      ? HIGHER_MESSAGE_LIMIT
+      : DAILY_MESSAGE_LIMIT
   const canSend = value.trim().length > 0 && !disabled
 
   // Grow the textarea with its content, up to the max-height set in CSS.
@@ -78,7 +88,7 @@ export function ChatInput({
         </div>
       </div>
       <p className="mt-2 text-center text-xs text-slate-500">
-        {t.chat.dailyLimit(DAILY_MESSAGE_LIMIT)}
+        {t.chat.dailyLimit(dailyLimit)}
       </p>
     </form>
   )

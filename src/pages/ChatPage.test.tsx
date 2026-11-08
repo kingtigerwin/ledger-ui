@@ -300,3 +300,13 @@ describe('given sisi, an admin, on the chat page', () => {
     expect(screen.getByTestId('transaction-total')).toHaveTextContent('$47.00')
   })
 })
+
+describe('given sisi on the chat page', () => {
+  it('tells her about her higher daily limit', async () => {
+    const app = renderApp('/login')
+    await signIn(app.user, 'sisi', 'sisi-password')
+    await app.user.click(await screen.findByRole('link', { name: 'Chat' }))
+
+    expect(await screen.findByText(/30 messages a day/i)).toBeInTheDocument()
+  })
+})
