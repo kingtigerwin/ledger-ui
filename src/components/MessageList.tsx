@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useI18n } from '../i18n/useI18n'
 import type { ChatMessage } from '../types'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
@@ -15,6 +16,7 @@ export function MessageList({
   onRetry,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const { t } = useI18n()
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' })
@@ -26,7 +28,7 @@ export function MessageList({
         className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6"
         role="log"
         aria-live="polite"
-        aria-label="Conversation"
+        aria-label={t.chat.conversation}
       >
         {messages.map((message, index) => (
           <MessageBubble

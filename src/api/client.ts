@@ -1,4 +1,4 @@
-import type { TokenResponse, User } from './types'
+import type { Locale, TokenResponse, User } from './types'
 
 // The UI, ledger-api (/api/*) and ledger-agent (/agent/*) share one origin: CloudFront in
 // production, Vite's proxy in dev. So paths are relative and the refresh cookie is first-party.
@@ -75,10 +75,15 @@ export const login = (username: string, password: string) =>
     body: { username, password },
   })
 
-export const register = (username: string, password: string, email: string) =>
+export const register = (
+  username: string,
+  password: string,
+  email: string,
+  locale: Locale,
+) =>
   request<User>('/api/v1/auth/register', {
     method: 'POST',
-    body: { username, password, email },
+    body: { username, password, email, locale },
   })
 
 export const logout = () =>

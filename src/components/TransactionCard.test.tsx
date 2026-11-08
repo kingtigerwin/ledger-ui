@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { Transaction } from '../api/types'
+import { I18nProvider } from '../i18n/I18nProvider'
 import { TransactionCard } from './TransactionCard'
 
 const txn = (fields: Partial<Transaction> & Pick<Transaction, 'id'>) => ({
@@ -15,13 +16,15 @@ const txn = (fields: Partial<Transaction> & Pick<Transaction, 'id'>) => ({
 describe('TransactionCard', () => {
   it('shows no owners or subtotals when no item has a username', () => {
     render(
-      <TransactionCard
-        title="Found"
-        transactions={[
-          txn({ id: 't1', merchant: 'Starbucks' }),
-          txn({ id: 't2', item: 'cake', amountCents: 3000 }),
-        ]}
-      />,
+      <I18nProvider>
+        <TransactionCard
+          kind="found"
+          transactions={[
+            txn({ id: 't1', merchant: 'Starbucks' }),
+            txn({ id: 't2', item: 'cake', amountCents: 3000 }),
+          ]}
+        />
+      </I18nProvider>,
     )
     expect(
       screen.getByText('food · Starbucks · 27 Oct 2026'),
@@ -33,13 +36,15 @@ describe('TransactionCard', () => {
 
   it('shows whose each item is, without subtotals, for one person', () => {
     render(
-      <TransactionCard
-        title="Found"
-        transactions={[
-          txn({ id: 't1', userId: 'u1', username: 'alice' }),
-          txn({ id: 't2', userId: 'u1', username: 'alice', item: 'cake' }),
-        ]}
-      />,
+      <I18nProvider>
+        <TransactionCard
+          kind="found"
+          transactions={[
+            txn({ id: 't1', userId: 'u1', username: 'alice' }),
+            txn({ id: 't2', userId: 'u1', username: 'alice', item: 'cake' }),
+          ]}
+        />
+      </I18nProvider>,
     )
     expect(screen.getAllByText('alice · food · 27 Oct 2026')).toHaveLength(2)
     expect(screen.queryByRole('list', { name: /by person/i })).toBeNull()
@@ -47,14 +52,31 @@ describe('TransactionCard', () => {
 
   it('adds a subtotal per person when more than one person appears', () => {
     render(
-      <TransactionCard
-        title="Found"
-        transactions={[
-          txn({ id: 't1', userId: 'u1', username: 'alice', amountCents: 500 }),
-          txn({ id: 't2', userId: 'u2', username: 'sisi', amountCents: 1200 }),
-          txn({ id: 't3', userId: 'u1', username: 'alice', amountCents: 3000 }),
-        ]}
-      />,
+      <I18nProvider>
+        <TransactionCard
+          kind="found"
+          transactions={[
+            txn({
+              id: 't1',
+              userId: 'u1',
+              username: 'alice',
+              amountCents: 500,
+            }),
+            txn({
+              id: 't2',
+              userId: 'u2',
+              username: 'sisi',
+              amountCents: 1200,
+            }),
+            txn({
+              id: 't3',
+              userId: 'u1',
+              username: 'alice',
+              amountCents: 3000,
+            }),
+          ]}
+        />
+      </I18nProvider>,
     )
     const subtotals = screen.getByRole('list', { name: /by person/i })
     const rows = within(subtotals).getAllByRole('listitem')
@@ -67,13 +89,15 @@ describe('TransactionCard', () => {
 
   it('labels items whose username is missing as an unknown user', () => {
     render(
-      <TransactionCard
-        title="Found"
-        transactions={[
-          txn({ id: 't1', userId: 'u1', username: 'alice' }),
-          txn({ id: 't2', userId: 'u9', username: null }),
-        ]}
-      />,
+      <I18nProvider>
+        <TransactionCard
+          kind="found"
+          transactions={[
+            txn({ id: 't1', userId: 'u1', username: 'alice' }),
+            txn({ id: 't2', userId: 'u9', username: null }),
+          ]}
+        />
+      </I18nProvider>,
     )
     expect(
       screen.getByText('Unknown user · food · 27 Oct 2026'),

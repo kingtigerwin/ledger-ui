@@ -1,8 +1,10 @@
 import type { PurchaseSearch } from '../api/types'
 import { capitalise, formatCents, formatDate } from '../format'
+import { useI18n } from '../i18n/useI18n'
 
 /** The lines ledger-api matched for "how much did I spend on bananas?". */
 export function PurchaseCard({ search }: { search: PurchaseSearch }) {
+  const { t } = useI18n()
   const { matches, count, totalCents, currency, includesPoints, from, to } =
     search
   if (matches.length === 0) return null
@@ -10,9 +12,9 @@ export function PurchaseCard({ search }: { search: PurchaseSearch }) {
   return (
     <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white text-sm">
       <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 font-medium text-slate-700">
-        {formatDate(from)} to {formatDate(to)}
+        {t.purchases.range(formatDate(from), formatDate(to))}
       </div>
-      <ul aria-label="Purchases found" className="divide-y divide-slate-100">
+      <ul aria-label={t.purchases.label} className="divide-y divide-slate-100">
         {matches.map((match, i) => (
           <li
             key={i}
@@ -29,7 +31,7 @@ export function PurchaseCard({ search }: { search: PurchaseSearch }) {
                   formatDate(match.date),
                 ]
                   .filter(Boolean)
-                  .join(' · ')}
+                  .join(t.common.separator)}
               </div>
             </div>
             <div className="shrink-0 font-medium tabular-nums">
@@ -39,19 +41,19 @@ export function PurchaseCard({ search }: { search: PurchaseSearch }) {
         ))}
       </ul>
       <div className="flex justify-between border-t border-slate-200 bg-slate-50 px-3 py-2 font-semibold">
-        <span>Total</span>
+        <span>{t.common.total}</span>
         <span className="tabular-nums" data-testid="purchases-total">
           {formatCents(totalCents, currency)}
         </span>
       </div>
       {count > matches.length && (
         <p className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">
-          Showing {matches.length} of {count}. The total covers them all.
+          {t.purchases.showing(matches.length, count)}
         </p>
       )}
       {includesPoints && (
         <p className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">
-          These are shelf prices. Some was paid with points.
+          {t.purchases.points}
         </p>
       )}
     </div>

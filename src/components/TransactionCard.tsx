@@ -1,32 +1,37 @@
 import type { Transaction } from '../api/types'
 import { formatCents, formatDate } from '../format'
+import { useI18n } from '../i18n/useI18n'
 
 interface TransactionCardProps {
-  title: 'Recorded' | 'Found'
+  kind: 'recorded' | 'found'
   transactions: Transaction[]
 }
 
-const ownerName = (t: Transaction) => t.username ?? 'Unknown user'
-
 /** Totals per owner, in order of first appearance. */
-function subtotalsByOwner(transactions: Transaction[]) {
+function subtotalsByOwner(
+  transactions: Transaction[],
+  ownerName: (txn: Transaction) => string,
+) {
   const subtotals = new Map<string, { name: string; totalCents: number }>()
-  for (const t of transactions) {
-    const key = t.userId ?? t.username ?? ''
-    const entry = subtotals.get(key) ?? { name: ownerName(t), totalCents: 0 }
-    entry.totalCents += t.amountCents
+  for (const txn of transactions) {
+    const key = txn.userId ?? txn.username ?? ''
+    const entry = subtotals.get(key) ?? { name: ownerName(txn), totalCents: 0 }
+    entry.totalCents += txn.amountCents
     subtotals.set(key, entry)
   }
   return [...subtotals.values()]
 }
 
-export function TransactionCard({ title, transactions }: TransactionCardProps) {
+export function TransactionCard({ kind, transactions }: TransactionCardProps) {
+  const { t } = useI18n()
+  const ownerName = (txn: Transaction) =>
+    txn.username ?? t.transactions.unknownUser
   const currency = transactions[0]?.currency ?? 'AUD'
-  const total = transactions.reduce((sum, t) => sum + t.amountCents, 0)
-  const showOwners = transactions.some((t) => t.username)
-  const subtotals = showOwners ? subtotalsByOwner(transactions) : []
+  const total = transactions.reduce((sum, txn) => sum + txn.amountCents, 0)
+  const showOwners = transactions.some((txn) => txn.username)
+  const subtotals = showOwners ? subtotalsByOwner(transactions, ownerName) : []
   const headerClass =
-    title === 'Recorded'
+    kind === 'recorded'
       ? 'bg-emerald-50 text-emerald-800'
       : 'bg-slate-50 text-slate-700'
 
@@ -35,37 +40,37 @@ export function TransactionCard({ title, transactions }: TransactionCardProps) {
       <div
         className={`flex items-center gap-2 border-b border-slate-200 px-3 py-2 font-medium ${headerClass}`}
       >
-        {title === 'Recorded' && <span aria-hidden="true">✓</span>}
-        {title}
+        {kind === 'recorded' && <span aria-hidden="true">✓</span>}
+        {t.transactions[kind]}
       </div>
       <ul className="divide-y divide-slate-100">
-        {transactions.map((t) => (
+        {transactions.map((txn) => (
           <li
-            key={t.id}
+            key={txn.id}
             className="flex items-start justify-between gap-3 px-3 py-2"
           >
             <div className="min-w-0">
-              <div className="font-medium text-slate-900">{t.item}</div>
+              <div className="font-medium text-slate-900">{txn.item}</div>
               <div className="text-xs text-slate-500">
                 {[
-                  showOwners && ownerName(t),
-                  t.category,
-                  t.merchant,
-                  formatDate(t.date),
+                  showOwners && ownerName(txn),
+                  t.categories[txn.category] ?? txn.category,
+                  txn.merchant,
+                  formatDate(txn.date),
                 ]
                   .filter(Boolean)
-                  .join(' · ')}
+                  .join(t.common.separator)}
               </div>
             </div>
             <div className="shrink-0 font-medium tabular-nums">
-              {formatCents(t.amountCents, t.currency)}
+              {formatCents(txn.amountCents, txn.currency)}
             </div>
           </li>
         ))}
       </ul>
       {subtotals.length > 1 && (
         <ul
-          aria-label="Subtotals by person"
+          aria-label={t.transactions.subtotals}
           className="border-t border-slate-200 bg-slate-50 px-3 py-1"
         >
           {subtotals.map(({ name, totalCents }, i) => (
@@ -80,7 +85,7 @@ export function TransactionCard({ title, transactions }: TransactionCardProps) {
       )}
       {transactions.length > 1 && (
         <div className="flex justify-between border-t border-slate-200 bg-slate-50 px-3 py-2 font-semibold">
-          <span>Total</span>
+          <span>{t.common.total}</span>
           <span className="tabular-nums" data-testid="transaction-total">
             {formatCents(total, currency)}
           </span>

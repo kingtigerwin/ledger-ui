@@ -2,14 +2,21 @@ import { useState } from 'react'
 import type { Insight, PossibleDuplicate, Transaction } from '../api/types'
 import { formatCents, formatDate } from '../format'
 import { useDeleteTransaction, useDismissInsight } from '../hooks/useHome'
+import type { Messages } from '../i18n/en'
+import { errorText } from '../i18n/errorText'
+import { useI18n } from '../i18n/useI18n'
 import { TransactionCard } from './TransactionCard'
 
 const quietButtonClass =
   'rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400'
 
-const confirmDelete = (t: Transaction) =>
+const confirmDelete = (t: Messages, txn: Transaction) =>
   window.confirm(
-    `Delete ${t.item}, ${formatCents(t.amountCents, t.currency)} on ${formatDate(t.date)}? This can't be undone.`,
+    t.insights.confirmDelete(
+      txn.item,
+      formatCents(txn.amountCents, txn.currency),
+      formatDate(txn.date),
+    ),
   )
 
 interface Wording {
@@ -20,8 +27,8 @@ interface Wording {
   dismiss: string
 }
 
-/** ledger-api sends facts; the words are written here, so only stored text isn't English. */
-function wordingFor(insight: Insight, today: string): Wording {
+/** ledger-api sends facts; the words are written here, so only stored text keeps its language. */
+function wordingFor(t: Messages, insight: Insight, today: string): Wording {
   switch (insight.type) {
     case 'rego_due': {
       const due = formatDate(insight.estimatedDueDate)
@@ -29,64 +36,83 @@ function wordingFor(insight: Insight, today: string): Wording {
       return {
         title:
           insight.estimatedDueDate < today
-            ? `Car rego was due around ${due}`
-            : `Car rego due around ${due}`,
-        body: `Estimated from your last payment of ${formatCents(insight.lastPaidCents, insight.currency)} on ${formatDate(last.date)}`,
-        view: 'View payment',
-        dismiss: 'Dismiss',
+            ? t.insights.regoWasDue(due)
+            : t.insights.regoDue(due),
+        body: t.insights.regoBody(
+          formatCents(insight.lastPaidCents, insight.currency),
+          formatDate(last.date),
+        ),
+        view: t.insights.viewPayment,
+        dismiss: t.common.dismiss,
       }
     }
     case 'possible_duplicate': {
-      const dates = [...new Set(insight.transactions.map((t) => t.date))]
+      const dates = [...new Set(insight.transactions.map((txn) => txn.date))]
       return {
-        title: 'Possibly recorded twice',
-        body: `${insight.merchant}, ${formatCents(insight.amountCents, insight.currency)}, recorded ${insight.transactions.length} times on ${dates.map(formatDate).join(' and ')}`,
-        view: 'Review',
-        dismiss: 'Not a duplicate',
+        title: t.insights.duplicateTitle,
+        body: t.insights.duplicateBody(
+          insight.merchant,
+          formatCents(insight.amountCents, insight.currency),
+          insight.transactions.length,
+          dates.map(formatDate),
+        ),
+        view: t.insights.review,
+        dismiss: t.insights.notDuplicate,
       }
     }
     case 'price_rise':
       return {
-        title: `${insight.merchant} went up`,
-        body: `${formatCents(insight.previousCents, insight.currency)} → ${formatCents(insight.currentCents, insight.currency)} since ${formatDate(insight.since)}, ${formatCents(insight.extraPerYearCents, insight.currency)} more a year`,
-        view: 'View charges',
-        dismiss: 'Dismiss',
+        title: t.insights.priceRiseTitle(insight.merchant),
+        body: t.insights.priceRiseBody(
+          formatCents(insight.previousCents, insight.currency),
+          formatCents(insight.currentCents, insight.currency),
+          formatDate(insight.since),
+          formatCents(insight.extraPerYearCents, insight.currency),
+        ),
+        view: t.insights.viewCharges,
+        dismiss: t.common.dismiss,
       }
   }
 }
 
 function DuplicateReview({ insight }: { insight: PossibleDuplicate }) {
   const remove = useDeleteTransaction()
+  const { t } = useI18n()
 
   return (
     <>
       <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200 text-sm">
-        {insight.transactions.map((t) => (
+        {insight.transactions.map((txn) => (
           <li
-            key={t.id}
+            key={txn.id}
             className="flex items-center justify-between gap-3 px-3 py-2"
           >
             <div className="min-w-0">
-              <div className="font-medium text-slate-900">{t.item}</div>
+              <div className="font-medium text-slate-900">{txn.item}</div>
               <div className="text-xs text-slate-500">
-                {[t.merchant, formatDate(t.date)].filter(Boolean).join(' · ')}
+                {[txn.merchant, formatDate(txn.date)]
+                  .filter(Boolean)
+                  .join(t.common.separator)}
               </div>
             </div>
             <button
               type="button"
-              aria-label={`Delete ${t.item} on ${formatDate(t.date)}`}
+              aria-label={t.insights.deleteLabel(
+                txn.item,
+                formatDate(txn.date),
+              )}
               disabled={remove.isPending}
-              onClick={() => confirmDelete(t) && remove.mutate(t.id)}
+              onClick={() => confirmDelete(t, txn) && remove.mutate(txn.id)}
               className="shrink-0 rounded-lg border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >
-              Delete
+              {t.common.delete}
             </button>
           </li>
         ))}
       </ul>
       {remove.isError && (
         <p role="alert" className="mt-2 text-sm text-red-700">
-          {remove.error.message}
+          {errorText(t, remove.error)}
         </p>
       )}
     </>
@@ -102,12 +128,13 @@ export function InsightCard({
 }) {
   const [open, setOpen] = useState(false)
   const dismiss = useDismissInsight()
+  const { t } = useI18n()
   const {
     title,
     body,
     view,
     dismiss: dismissLabel,
-  } = wordingFor(insight, today)
+  } = wordingFor(t, insight, today)
 
   return (
     <li className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -133,14 +160,14 @@ export function InsightCard({
       </div>
       {dismiss.isError && (
         <p role="alert" className="mt-2 text-sm text-red-700">
-          {dismiss.error.message}
+          {errorText(t, dismiss.error)}
         </p>
       )}
       {open &&
         (insight.type === 'possible_duplicate' ? (
           <DuplicateReview insight={insight} />
         ) : (
-          <TransactionCard title="Found" transactions={insight.transactions} />
+          <TransactionCard kind="found" transactions={insight.transactions} />
         ))}
     </li>
   )

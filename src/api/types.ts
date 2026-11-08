@@ -1,4 +1,6 @@
 export type Role = 'admin' | 'customer'
+/** The languages Ledger is written in. */
+export type Locale = 'en' | 'zh-CN'
 export type UserStatus = 'pending' | 'active' | 'disabled'
 
 /** What `GET /api/v1/auth/me` returns. */
@@ -9,6 +11,8 @@ export interface User {
   status: UserStatus
   /** Users created before emails were collected, such as sisi, have none. */
   email?: string
+  /** The language they chose; none means follow the browser. */
+  locale?: Locale
 }
 
 /** A row of `GET /api/v1/admin/users`. */

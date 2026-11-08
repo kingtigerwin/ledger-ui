@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { flybuysReceipt, oneLineReceipt } from '../mocks/receipts'
 import { fitWithin } from './shrinkImage'
+import { en } from '../i18n/en'
 import { toNewTransaction } from './toTransaction'
+
+const STORED = en.receipts.stored
 
 const entry = {
   merchant: 'Coles',
@@ -12,7 +15,7 @@ const entry = {
 
 describe('given a read receipt', () => {
   it('records the money paid, with the goods value kept on the receipt', () => {
-    const t = toNewTransaction(flybuysReceipt, entry, 'id-1')
+    const t = toNewTransaction(flybuysReceipt, entry, 'id-1', STORED)
 
     expect(t.id).toBe('id-1')
     expect(t.amountCents).toBe(50)
@@ -21,27 +24,31 @@ describe('given a read receipt', () => {
   })
 
   it('counts the lines as the item', () => {
-    expect(toNewTransaction(flybuysReceipt, entry, 'x').item).toBe('3 items')
+    expect(toNewTransaction(flybuysReceipt, entry, 'x', STORED).item).toBe(
+      '3 items',
+    )
   })
 
   it('names a single line as the item, in plain words', () => {
-    expect(toNewTransaction(oneLineReceipt, entry, 'x').item).toBe('barramundi')
+    expect(toNewTransaction(oneLineReceipt, entry, 'x', STORED).item).toBe(
+      'barramundi',
+    )
   })
 
   it('notes what points paid', () => {
-    expect(toNewTransaction(flybuysReceipt, entry, 'x').note).toBe(
+    expect(toNewTransaction(flybuysReceipt, entry, 'x', STORED).note).toBe(
       'Flybuys value redeemed: $30.00',
     )
   })
 
   it('has no note when only money was paid', () => {
-    expect(toNewTransaction(oneLineReceipt, entry, 'x')).not.toHaveProperty(
-      'note',
-    )
+    expect(
+      toNewTransaction(oneLineReceipt, entry, 'x', STORED),
+    ).not.toHaveProperty('note')
   })
 
   it('leaves out what was not printed, which the API would refuse', () => {
-    const { receipt } = toNewTransaction(oneLineReceipt, entry, 'x')
+    const { receipt } = toNewTransaction(oneLineReceipt, entry, 'x', STORED)
 
     expect(receipt).not.toHaveProperty('savingsCents')
     expect(receipt).not.toHaveProperty('receiptNumber')
@@ -49,7 +56,7 @@ describe('given a read receipt', () => {
   })
 
   it('never carries the fields that belong to the transaction', () => {
-    const { receipt } = toNewTransaction(flybuysReceipt, entry, 'x')
+    const { receipt } = toNewTransaction(flybuysReceipt, entry, 'x', STORED)
 
     expect(receipt).not.toHaveProperty('merchant')
     expect(receipt).not.toHaveProperty('paidCents')
@@ -60,6 +67,7 @@ describe('given a read receipt', () => {
       flybuysReceipt,
       { ...entry, merchant: 'Woolworths', amountCents: 75 },
       'x',
+      STORED,
     )
 
     expect(t.merchant).toBe('Woolworths')

@@ -1,5 +1,6 @@
 import type { Transaction } from '../api/types'
 import { capitalise, formatCents } from '../format'
+import { useI18n } from '../i18n/useI18n'
 
 const Row = ({
   label,
@@ -21,8 +22,11 @@ const Row = ({
 /** What's on the receipt: plain names to read, over names as printed to check against the paper. */
 export function ReceiptItems({ transaction }: { transaction: Transaction }) {
   const { currency, receipt } = transaction
+  const { t } = useI18n()
   if (!receipt) return null
-  const where = [receipt.location, receipt.time].filter(Boolean).join(' · ')
+  const where = [receipt.location, receipt.time]
+    .filter(Boolean)
+    .join(t.common.separator)
 
   return (
     <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white text-sm">
@@ -31,7 +35,7 @@ export function ReceiptItems({ transaction }: { transaction: Transaction }) {
           {where}
         </p>
       )}
-      <ul aria-label="Receipt items" className="divide-y divide-slate-100">
+      <ul aria-label={t.receipts.items} className="divide-y divide-slate-100">
         {receipt.lines?.map((line, i) => (
           <li key={i} className="flex justify-between gap-3 px-3 py-1.5">
             <div className="min-w-0 break-words">
@@ -50,14 +54,14 @@ export function ReceiptItems({ transaction }: { transaction: Transaction }) {
       </ul>
       <div className="border-t border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
         <Row
-          label="Receipt total"
+          label={t.receipts.receiptTotal}
           cents={receipt.totalCents}
           currency={currency}
           testId="receipt-total"
         />
         {!!receipt.gstCents && (
           <Row
-            label="GST included"
+            label={t.receipts.gst}
             cents={receipt.gstCents}
             currency={currency}
             testId="receipt-gst"
@@ -65,7 +69,7 @@ export function ReceiptItems({ transaction }: { transaction: Transaction }) {
         )}
         {!!receipt.savingsCents && (
           <Row
-            label="You saved"
+            label={t.receipts.saved}
             cents={receipt.savingsCents}
             currency={currency}
             testId="receipt-savings"

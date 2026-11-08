@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   capitalise,
-  greeting,
+  partOfDay,
   localDate,
   localMonth,
   previousMonth,
@@ -32,12 +32,12 @@ describe('given the customer local clock', () => {
   })
 
   it.each([
-    [0, 'Good morning'],
-    [11, 'Good morning'],
-    [12, 'Good afternoon'],
-    [17, 'Good afternoon'],
-    [18, 'Good evening'],
-  ])('at %i:00 says %s', (hour, expected) => {
-    expect(greeting(new Date(2026, 10, 1, hour))).toBe(expected)
+    [0, 'morning'],
+    [11, 'morning'],
+    [12, 'afternoon'],
+    [17, 'afternoon'],
+    [18, 'evening'],
+  ])('at %i:00 it is %s', (hour, expected) => {
+    expect(partOfDay(new Date(2026, 10, 1, hour))).toBe(expected)
   })
 })

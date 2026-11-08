@@ -1,4 +1,5 @@
 import { formatTime } from '../format'
+import { useI18n } from '../i18n/useI18n'
 import type { ChatMessage } from '../types'
 import { PurchaseCard } from './PurchaseCard'
 import { SummaryCard } from './SummaryCard'
@@ -17,6 +18,7 @@ export function MessageBubble({
   retryDisabled,
 }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+  const { t } = useI18n()
 
   const bubbleClass = isUser
     ? 'bg-indigo-600 text-white rounded-br-sm'
@@ -36,18 +38,18 @@ export function MessageBubble({
               disabled={retryDisabled}
               className="mt-2 rounded-md border border-red-300 bg-white px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
             >
-              Retry
+              {t.chat.retry}
             </button>
           )}
         </div>
         {message.transactions && message.transactions.length > 0 && (
           <TransactionCard
-            title="Recorded"
+            kind="recorded"
             transactions={message.transactions}
           />
         )}
         {message.listed && message.listed.length > 0 && (
-          <TransactionCard title="Found" transactions={message.listed} />
+          <TransactionCard kind="found" transactions={message.listed} />
         )}
         {message.summaries?.map((summary) => (
           <SummaryCard key={summary.month} summary={summary} />

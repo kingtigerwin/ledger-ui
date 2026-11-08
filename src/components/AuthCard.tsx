@@ -1,4 +1,6 @@
 import { useId, type ReactNode } from 'react'
+import { LanguageMenu } from '../i18n/LanguageMenu'
+import { useI18n } from '../i18n/useI18n'
 
 interface AuthCardProps {
   title: string
@@ -11,6 +13,9 @@ export function AuthCard({ title, subtitle, children }: AuthCardProps) {
   return (
     <main className="flex min-h-full items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="-mt-2 -mr-2 flex justify-end">
+          <LanguageMenu />
+        </div>
         <div className="mb-6 text-center">
           <div className="text-sm font-semibold tracking-wide text-indigo-600 uppercase">
             Ledger
@@ -100,6 +105,7 @@ export const primaryButtonClass =
  * limited to this site.
  */
 export function GoogleLink() {
+  const { t } = useI18n()
   return (
     <a
       href="/api/v1/auth/google/start"
@@ -123,7 +129,7 @@ export function GoogleLink() {
           d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
         />
       </svg>
-      Continue with Google
+      {t.auth.continueWithGoogle}
     </a>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type FormEvent, type KeyboardEvent } from 'react'
 import { DAILY_MESSAGE_LIMIT } from '../constants'
+import { useI18n } from '../i18n/useI18n'
 
 interface ChatInputProps {
   value: string
@@ -15,6 +16,7 @@ export function ChatInput({
   disabled,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const { t } = useI18n()
   const canSend = value.trim().length > 0 && !disabled
 
   // Grow the textarea with its content, up to the max-height set in CSS.
@@ -50,7 +52,7 @@ export function ChatInput({
     <form onSubmit={handleSubmit} className="w-full">
       <div className="rounded-2xl border border-slate-300 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-200">
         <label htmlFor="chat-input" className="sr-only">
-          Describe your spending
+          {t.chat.inputLabel}
         </label>
         <textarea
           id="chat-input"
@@ -59,25 +61,24 @@ export function ChatInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="e.g. Today I went to Coles and spent $30 on food and $6 on coffee"
+          placeholder={t.chat.placeholder}
           className="block max-h-72 min-h-28 w-full resize-none rounded-t-2xl bg-transparent px-4 pt-3 text-base leading-relaxed outline-none"
         />
         <div className="flex items-center justify-between gap-3 px-3 pb-3">
           <span className="hidden text-xs text-slate-400 sm:inline">
-            Enter to send · Shift+Enter for a new line
+            {t.chat.keyHint}
           </span>
           <button
             type="submit"
             disabled={!canSend}
             className="ml-auto rounded-xl bg-indigo-600 px-5 py-2 font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            Send
+            {t.chat.send}
           </button>
         </div>
       </div>
       <p className="mt-2 text-center text-xs text-slate-500">
-        Each person can send {DAILY_MESSAGE_LIMIT} messages a day. This resets
-        at midnight Sydney time.
+        {t.chat.dailyLimit(DAILY_MESSAGE_LIMIT)}
       </p>
     </form>
   )

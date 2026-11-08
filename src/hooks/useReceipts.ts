@@ -10,6 +10,8 @@ import type {
 } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import { localDate } from '../format'
+import { errorText } from '../i18n/errorText'
+import { useI18n } from '../i18n/useI18n'
 import {
   billToNewTransaction,
   toNewTransaction,
@@ -45,11 +47,11 @@ const entryFrom = (receipt: ReadReceipt, date: string): ReceiptEntry => ({
   amountCents: receipt.paidCents,
 })
 
-const errorMessage = (err: unknown) =>
-  err instanceof Error ? err.message : 'Something went wrong. Please try again.'
-
 export function useReceipts() {
   const { authRequest } = useAuth()
+  const { t } = useI18n()
+  const errorMessage = (err: unknown) => errorText(t, err)
+  const stored = t.receipts.stored
   const queryClient = useQueryClient()
   const [stage, setStage] = useState<Stage>({ name: 'idle' })
 
@@ -90,8 +92,8 @@ export function useReceipts() {
         name: 'failed',
         message:
           err instanceof PdfTooLargeError
-            ? 'That PDF is too large (over 3 MB). Try a smaller one, or a screenshot of the bill or receipt.'
-            : "Ledger couldn't open that photo. Please try a JPEG or PNG image, or a PDF.",
+            ? t.receipts.pdfTooLarge
+            : t.receipts.cantOpen,
       })
       return
     }
@@ -114,8 +116,7 @@ export function useReceipts() {
       if (reply.problems.includes('nothing_paid')) {
         setStage({
           name: 'failed',
-          message:
-            'This receipt was paid entirely with points, so there is no money to record.',
+          message: t.receipts.allPoints,
         })
         return
       }
@@ -142,7 +143,7 @@ export function useReceipts() {
       return
     }
     try {
-      await post(toNewTransaction(receipt, entry, id))
+      await post(toNewTransaction(receipt, entry, id, stored))
     } catch (err) {
       setStage({ ...review, saveError: errorMessage(err) })
     }
@@ -151,7 +152,7 @@ export function useReceipts() {
   const saveReview = async (entry: ReceiptEntry) => {
     if (stage.name !== 'review') return
     try {
-      await post(toNewTransaction(stage.receipt, entry, stage.id))
+      await post(toNewTransaction(stage.receipt, entry, stage.id, stored))
     } catch (err) {
       setStage({ ...stage, saveError: errorMessage(err) })
     }
@@ -161,7 +162,12 @@ export function useReceipts() {
     if (stage.name !== 'bill') return
     try {
       await post(
-        billToNewTransaction(stage.bill, stage.id, localDate(new Date())),
+        billToNewTransaction(
+          stage.bill,
+          stage.id,
+          localDate(new Date()),
+          stored,
+        ),
       )
     } catch (err) {
       setStage({ ...stage, saveError: errorMessage(err) })

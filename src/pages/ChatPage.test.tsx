@@ -9,7 +9,7 @@ import {
 } from '../mocks/handlers'
 import { server } from '../mocks/server'
 import { renderApp, signIn } from '../test/renderApp'
-import { EXAMPLE_PROMPTS } from '../constants'
+import { en } from '../i18n/en'
 
 async function openChat() {
   const app = renderApp('/login')
@@ -151,8 +151,8 @@ describe('given alice on the chat page', () => {
 
   it('fills the input when an example prompt is clicked', async () => {
     const { user, input } = await openChat()
-    await user.click(screen.getByRole('button', { name: EXAMPLE_PROMPTS[0] }))
-    expect(input).toHaveValue(EXAMPLE_PROMPTS[0])
+    await user.click(screen.getByRole('button', { name: en.chat.examples[0] }))
+    expect(input).toHaveValue(en.chat.examples[0])
   })
 
   it("doesn't list other people's transactions", async () => {
