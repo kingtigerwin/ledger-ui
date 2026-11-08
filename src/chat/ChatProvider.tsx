@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 import { ApiError } from '../api/client'
 import type { ChatResponse, ChatTurn } from '../api/types'
 import { useAuth } from '../auth/useAuth'
+import { errorText } from '../i18n/errorText'
+import { useI18n } from '../i18n/useI18n'
 import { HOME_QUERY_KEY } from '../hooks/useHome'
 import type { ChatMessage } from '../types'
 import { ChatContext } from './context'
@@ -39,6 +41,7 @@ function toHistory(messages: ChatMessage[]): ChatTurn[] {
  */
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { authRequest } = useAuth()
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const mutation = useMutation({
@@ -75,7 +78,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           ...prev,
           createMessage({
             role: 'assistant',
-            text: error.message,
+            text: errorText(t, error),
             isError: true,
             retryOf: canRetry(error) ? userMessageId : undefined,
           }),

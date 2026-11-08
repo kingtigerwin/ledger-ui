@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import App from './App.tsx'
 import { AuthProvider } from './auth/AuthProvider.tsx'
+import { I18nProvider } from './i18n/I18nProvider.tsx'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -22,9 +23,11 @@ enableMocking().then(() => {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <I18nProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </I18nProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </StrictMode>,

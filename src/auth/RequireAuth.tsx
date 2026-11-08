@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router'
 import type { Role } from '../api/types'
+import { useI18n } from '../i18n/useI18n'
 import { useAuth } from './useAuth'
 
 interface RequireAuthProps {
@@ -13,11 +14,12 @@ interface RequireAuthProps {
 export function RequireAuth({ children, role }: RequireAuthProps) {
   const { state } = useAuth()
   const location = useLocation()
+  const { t } = useI18n()
 
   if (state.status === 'loading') {
     return (
       <div className="flex h-full items-center justify-center text-slate-500">
-        Loading…
+        {t.common.loading}
       </div>
     )
   }

@@ -8,17 +8,17 @@ import { SummaryCard } from '../components/SummaryCard'
 import {
   formatCents,
   formatMonth,
-  greeting,
   localDate,
   localMonth,
+  partOfDay,
   previousMonth,
 } from '../format'
 import { useInsights, useMonthlySummary } from '../hooks/useHome'
-
-const ATTENTION_HEADING = 'Needs your attention'
+import { useI18n } from '../i18n/useI18n'
 
 function Spend({ month }: { month: string }) {
   const summary = useMonthlySummary(month)
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   // Early in a month a bare $0.00 looks broken, so last month's total gives it context. It's only
   // asked for then, so an ordinary load makes no extra request.
@@ -27,18 +27,18 @@ function Spend({ month }: { month: string }) {
 
   return (
     <div className="min-w-0 flex-1">
-      <p className="text-sm text-slate-500">This month's spend</p>
+      <p className="text-sm text-slate-500">{t.home.thisMonthsSpend}</p>
       {summary.isPending ? (
         <p className="mt-1 text-3xl font-semibold text-slate-300">…</p>
       ) : summary.isError ? (
         <p role="alert" className="mt-1 text-sm text-red-700">
-          Couldn't load your spend.{' '}
+          {t.home.couldntLoadSpend}{' '}
           <button
             type="button"
             onClick={() => summary.refetch()}
             className="underline"
           >
-            Try again
+            {t.common.tryAgain}
           </button>
         </p>
       ) : nothingYet ? (
@@ -50,10 +50,10 @@ function Spend({ month }: { month: string }) {
             {formatCents(0, summary.data.currency)}
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            Nothing recorded yet this month
+            {t.home.nothingYet}
             {!!lastMonth.data?.totalCents && (
               <>
-                {' · '}
+                {t.common.separator}
                 {formatMonth(lastMonth.data.month)}:{' '}
                 {formatCents(
                   lastMonth.data.totalCents,
@@ -74,7 +74,7 @@ function Spend({ month }: { month: string }) {
             <span className="text-3xl font-semibold tabular-nums">
               {formatCents(summary.data.totalCents, summary.data.currency)}
             </span>
-            <span className="text-sm text-indigo-700">by category</span>
+            <span className="text-sm text-indigo-700">{t.home.byCategory}</span>
           </button>
           {open && <SummaryCard summary={summary.data} />}
         </>
@@ -90,8 +90,8 @@ export function HomePage() {
   const insights = useInsights(today)
   const count = insights.data?.length ?? 0
   const { state } = useAuth()
-  // The header leaves the username out on a phone, so this is where it shows there.
-  const name = state.status === 'signedIn' ? `, ${state.user.username}` : ''
+  const { t } = useI18n()
+  const greeting = t.home.greeting[partOfDay(now)]
 
   return (
     <div className="flex h-full flex-col">
@@ -100,17 +100,19 @@ export function HomePage() {
         <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
           <div>
             <h1 className="text-2xl font-semibold text-slate-800">
-              {greeting(now)}
-              {name}
+              {/* The header leaves the username out on a phone, so this is where it shows there. */}
+              {state.status === 'signedIn'
+                ? t.home.greetingName(greeting, state.user.username)
+                : greeting}
             </h1>
-            <p className="text-slate-500">Your financial inbox</p>
+            <p className="text-slate-500">{t.home.subtitle}</p>
           </div>
 
           <div className="flex flex-wrap items-start gap-6">
             <Spend month={localMonth(now)} />
             {count > 0 && (
               <div>
-                <p className="text-sm text-slate-500">To review</p>
+                <p className="text-sm text-slate-500">{t.home.toReview}</p>
                 <p
                   data-testid="to-review"
                   className="mt-1 text-3xl font-semibold tabular-nums"
@@ -124,36 +126,31 @@ export function HomePage() {
           <ReceiptScanner />
 
           <section className="flex flex-col gap-3">
-            <h2 className="font-medium text-slate-800">{ATTENTION_HEADING}</h2>
+            <h2 className="font-medium text-slate-800">{t.home.attention}</h2>
             {insights.isPending ? (
-              <p className="text-sm text-slate-500">Checking…</p>
+              <p className="text-sm text-slate-500">{t.home.checking}</p>
             ) : insights.isError ? (
               <p role="alert" className="text-sm text-red-700">
-                Couldn't check what needs your attention.{' '}
+                {t.home.couldntCheck}{' '}
                 <button
                   type="button"
                   onClick={() => insights.refetch()}
                   className="underline"
                 >
-                  Try again
+                  {t.common.tryAgain}
                 </button>
               </p>
             ) : count === 0 ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
                 <p className="font-medium text-slate-900">
-                  Nothing needs your attention
+                  {t.home.nothingNeedsAttention}
                 </p>
                 <p className="mt-1 text-slate-600">
-                  The more you record, the more Ledger can spot. You can add
-                  past expenses in the chat too, such as “I paid $900 rego last
-                  November”.
+                  {t.home.nothingNeedsAttentionBody}
                 </p>
               </div>
             ) : (
-              <ul
-                aria-label={ATTENTION_HEADING}
-                className="flex flex-col gap-3"
-              >
+              <ul aria-label={t.home.attention} className="flex flex-col gap-3">
                 {insights.data.map((insight) => (
                   <InsightCard
                     key={insight.id}

@@ -7,6 +7,8 @@ import {
   primaryButtonClass,
   TextField,
 } from '../components/AuthCard'
+import { errorText } from '../i18n/errorText'
+import { useI18n } from '../i18n/useI18n'
 
 /** ledger-api rejects a missing, malformed or over-long email with 400 `validation_failed`. */
 const isEmailRejected = (err: unknown) =>
@@ -15,32 +17,31 @@ const isEmailRejected = (err: unknown) =>
   !!err.details?.some((issue) => issue.path[0] === 'email')
 
 export function RegisterPage() {
+  const { t, locale } = useI18n()
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [emailError, setEmailError] = useState<string | null>(null)
+  // What went wrong, not its words, so choosing another language rewords it.
+  const [failure, setFailure] = useState<unknown>(null)
+  const [emailRejected, setEmailRejected] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [registered, setRegistered] = useState(false)
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    setError(null)
-    setEmailError(null)
+    setFailure(null)
+    setEmailRejected(false)
     setSubmitting(true)
     try {
-      await register(username.trim(), password, email.trim())
+      // The language on screen, so the "waiting for approval" email is in it too.
+      await register(username.trim(), password, email.trim(), locale)
       setRegistered(true)
     } catch (err) {
       if (isEmailRejected(err)) {
-        setEmailError('Enter a valid email address.')
+        setEmailRejected(true)
         return
       }
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Something went wrong. Please try again.',
-      )
+      setFailure(err)
     } finally {
       setSubmitting(false)
     }
@@ -48,28 +49,25 @@ export function RegisterPage() {
 
   if (registered) {
     return (
-      <AuthCard title="Account created">
+      <AuthCard title={t.auth.accountCreated}>
         <p role="status" className="text-center text-slate-600">
-          Check your email: your account is waiting for approval.
+          {t.auth.checkEmail}
         </p>
         <Link
           to="/login"
           className={`${primaryButtonClass} mt-6 block text-center`}
         >
-          Back to sign in
+          {t.common.backToSignIn}
         </Link>
       </AuthCard>
     )
   }
 
   return (
-    <AuthCard
-      title="Register"
-      subtitle="An admin approves new accounts before they can sign in."
-    >
+    <AuthCard title={t.auth.registerTitle} subtitle={t.auth.registerSubtitle}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <TextField
-          label="Username"
+          label={t.auth.username}
           name="username"
           value={username}
           onChange={setUsername}
@@ -77,38 +75,38 @@ export function RegisterPage() {
           autoFocus
         />
         <TextField
-          label="Email"
+          label={t.auth.email}
           name="email"
           type="email"
           value={email}
           onChange={setEmail}
           autoComplete="email"
-          error={emailError}
+          error={emailRejected ? t.auth.invalidEmail : null}
         />
         <TextField
-          label="Password"
+          label={t.auth.password}
           name="password"
           type="password"
           value={password}
           onChange={setPassword}
           autoComplete="new-password"
         />
-        <FormError message={error} />
+        <FormError message={failure ? errorText(t, failure) : null} />
         <button
           type="submit"
           disabled={submitting}
           className={primaryButtonClass}
         >
-          {submitting ? 'Creating account…' : 'Create account'}
+          {submitting ? t.auth.creatingAccount : t.auth.createAccount}
         </button>
       </form>
       <p className="mt-6 text-center text-sm text-slate-500">
-        Already have an account?{' '}
+        {t.auth.alreadyHaveAccount}{' '}
         <Link
           to="/login"
           className="font-medium text-indigo-600 hover:underline"
         >
-          Sign in
+          {t.auth.signIn}
         </Link>
       </p>
     </AuthCard>

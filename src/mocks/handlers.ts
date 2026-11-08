@@ -6,6 +6,7 @@ import type {
   ChatResponse,
   Insight,
   NewTransaction,
+  Locale,
   ReadReply,
   Transaction,
   UserStatus,
@@ -79,6 +80,13 @@ export function seedTransaction(
 /** What the agent reads the next photos as. */
 export function seedReceiptReply(reply: ReadReply) {
   db.receiptReply = reply
+}
+
+/** Gives `username` a language, as if they had chosen it on another device. */
+export function setUserLocale(username: string, locale: Locale) {
+  const user = findUser(username)
+  if (!user) throw new Error(`No mock user ${username}`)
+  user.locale = locale
 }
 
 /** What's in `username`'s ledger. */
@@ -281,10 +289,11 @@ function chat(user: MockUser, { messages }: ChatRequest): ChatResponse {
 
 export const handlers = [
   http.post('*/api/v1/auth/register', async ({ request }) => {
-    const { username, password, email } = (await request.json()) as {
+    const { username, password, email, locale } = (await request.json()) as {
       username: string
       password: string
       email?: string
+      locale?: Locale
     }
     // Like ledger-api's zod check: an address with a dotted domain, at most 254 characters.
     if (
@@ -307,6 +316,7 @@ export const handlers = [
       return apiError(409, 'username_taken', 'That username is taken')
     }
     const user = seedUser(username.toLowerCase(), password, { email })
+    if (locale) user.locale = locale
     return HttpResponse.json(publicUser(user), { status: 201 })
   }),
 
@@ -349,6 +359,16 @@ export const handlers = [
   http.get(
     '*/api/v1/auth/me',
     withUser((user) => HttpResponse.json(publicUser(user))),
+  ),
+
+  http.patch(
+    '*/api/v1/auth/me',
+    withUser(async (user, { request }) => {
+      const { locale } = (await request.json()) as { locale: Locale | null }
+      if (locale) user.locale = locale
+      else delete user.locale
+      return HttpResponse.json(publicUser(user))
+    }),
   ),
 
   http.get(

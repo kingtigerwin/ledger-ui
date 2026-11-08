@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import type { MonthlySummary } from '../api/types'
-import { capitalise, formatCents, formatDate, formatMonth } from '../format'
+import { formatCents, formatDate, formatMonth } from '../format'
 import { useCategoryTransactions } from '../hooks/useHome'
+import { categoryName } from '../i18n/categoryName'
+import { useI18n } from '../i18n/useI18n'
 
 /** "58%", or "<1%" for a sliver, so a category with spending never reads as 0%. */
 function share(cents: number, totalCents: number) {
@@ -17,42 +19,45 @@ function CategoryTransactions({
   category: string
 }) {
   const transactions = useCategoryTransactions(month, category)
+  const { t } = useI18n()
 
   if (transactions.isPending) {
-    return <p className="px-3 pb-2 text-slate-400">Loading…</p>
+    return <p className="px-3 pb-2 text-slate-400">{t.common.loading}</p>
   }
   if (transactions.isError) {
     return (
       <p role="alert" className="px-3 pb-2 text-red-700">
-        Couldn't load these.{' '}
+        {t.summary.couldntLoad}{' '}
         <button
           type="button"
           onClick={() => transactions.refetch()}
           className="underline"
         >
-          Try again
+          {t.common.tryAgain}
         </button>
       </p>
     )
   }
   return (
     <ul
-      aria-label={`${capitalise(category)} transactions`}
+      aria-label={t.summary.categoryTransactions(categoryName(t, category))}
       className="mx-3 mb-2 divide-y divide-slate-100 rounded-lg bg-slate-50"
     >
-      {transactions.data.map((t) => (
+      {transactions.data.map((txn) => (
         <li
-          key={t.id}
+          key={txn.id}
           className="flex items-start justify-between gap-3 px-3 py-2"
         >
           <div className="min-w-0">
-            <div className="text-slate-900">{t.item}</div>
+            <div className="text-slate-900">{txn.item}</div>
             <div className="text-xs text-slate-500">
-              {[t.merchant, formatDate(t.date)].filter(Boolean).join(' · ')}
+              {[txn.merchant, formatDate(txn.date)]
+                .filter(Boolean)
+                .join(t.common.separator)}
             </div>
           </div>
           <div className="shrink-0 tabular-nums">
-            {formatCents(t.amountCents, t.currency)}
+            {formatCents(txn.amountCents, txn.currency)}
           </div>
         </li>
       ))}
@@ -62,6 +67,7 @@ function CategoryTransactions({
 
 export function SummaryCard({ summary }: { summary: MonthlySummary }) {
   const [openCategory, setOpenCategory] = useState<string | null>(null)
+  const { t } = useI18n()
 
   return (
     <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white text-sm">
@@ -88,7 +94,7 @@ export function SummaryCard({ summary }: { summary: MonthlySummary }) {
                     <span aria-hidden="true" className="mr-1 text-slate-400">
                       {open ? '▾' : '▸'}
                     </span>
-                    {capitalise(category)}
+                    {categoryName(t, category)}
                   </span>
                   <span className="tabular-nums">
                     {formatCents(totalCents, summary.currency)}
@@ -97,7 +103,7 @@ export function SummaryCard({ summary }: { summary: MonthlySummary }) {
                 <span className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                   <span className="shrink-0">
                     {count !== undefined &&
-                      `${count} ${count === 1 ? 'item' : 'items'} · `}
+                      `${t.summary.items(count)}${t.common.separator}`}
                     {percent}
                   </span>
                   <span

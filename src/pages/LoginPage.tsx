@@ -8,6 +8,9 @@ import {
 } from 'react-router'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/useAuth'
+import type { Messages } from '../i18n/en'
+import { errorText } from '../i18n/errorText'
+import { useI18n } from '../i18n/useI18n'
 import {
   AuthCard,
   FormError,
@@ -18,28 +21,31 @@ import {
 
 // Google sign-in ends with a redirect back here, so its outcome arrives in the URL. Only these
 // codes show anything: the URL is anyone's to write, so its text is never displayed.
-const REDIRECT_ERRORS: Record<string, string> = {
-  google_failed:
-    "Google sign-in didn't work. Please try again, or use your username and password.",
-  google_unavailable: "Google sign-in isn't available right now.",
+const REDIRECT_ERRORS: Record<string, keyof Messages['auth']> = {
+  google_failed: 'googleFailed',
+  google_unavailable: 'googleUnavailable',
 }
 
-function loginErrorMessage(err: unknown): string {
-  if (!(err instanceof ApiError))
-    return 'Something went wrong. Please try again.'
-  return err.message
-}
+/** Kept as what went wrong, not its words, so choosing another language rewords it. */
+type Problem = { redirect: keyof Messages['auth'] } | { err: unknown }
 
 export function LoginPage() {
   const { state, login } = useAuth()
+  const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(
-    () => REDIRECT_ERRORS[searchParams.get('error') ?? ''] ?? null,
-  )
+  const [problem, setProblem] = useState<Problem | null>(() => {
+    const redirect = REDIRECT_ERRORS[searchParams.get('error') ?? '']
+    return redirect ? { redirect } : null
+  })
+  const error =
+    problem &&
+    ('redirect' in problem
+      ? (t.auth[problem.redirect] as string)
+      : errorText(t, problem.err))
   const [submitting, setSubmitting] = useState(false)
 
   const from = (location.state as { from?: string } | null)?.from ?? '/'
@@ -47,7 +53,7 @@ export function LoginPage() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    setError(null)
+    setProblem(null)
     setSubmitting(true)
     try {
       await login(username.trim(), password)
@@ -57,16 +63,16 @@ export function LoginPage() {
         navigate('/pending', { replace: true })
         return
       }
-      setError(loginErrorMessage(err))
+      setProblem({ err })
       setSubmitting(false)
     }
   }
 
   return (
-    <AuthCard title="Sign in" subtitle="Record your spending by chatting.">
+    <AuthCard title={t.auth.signInTitle} subtitle={t.auth.signInSubtitle}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <TextField
-          label="Username"
+          label={t.auth.username}
           name="username"
           value={username}
           onChange={setUsername}
@@ -74,7 +80,7 @@ export function LoginPage() {
           autoFocus
         />
         <TextField
-          label="Password"
+          label={t.auth.password}
           name="password"
           type="password"
           value={password}
@@ -87,22 +93,22 @@ export function LoginPage() {
           disabled={submitting || state.status === 'loading'}
           className={primaryButtonClass}
         >
-          {submitting ? 'Signing in…' : 'Sign in'}
+          {submitting ? t.auth.signingIn : t.auth.signIn}
         </button>
       </form>
       <div className="my-4 flex items-center gap-3 text-sm text-slate-400">
         <span className="h-px flex-1 bg-slate-200" />
-        or
+        {t.auth.or}
         <span className="h-px flex-1 bg-slate-200" />
       </div>
       <GoogleLink />
       <p className="mt-6 text-center text-sm text-slate-500">
-        No account yet?{' '}
+        {t.auth.noAccount}{' '}
         <Link
           to="/register"
           className="font-medium text-indigo-600 hover:underline"
         >
-          Register
+          {t.auth.register}
         </Link>
       </p>
     </AuthCard>

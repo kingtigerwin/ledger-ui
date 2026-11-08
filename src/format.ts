@@ -1,4 +1,14 @@
-const LOCALE = 'en-AU'
+import type { Locale } from './api/types'
+
+// English is Australian English: dates as 3 Nov 2026, amounts in AUD as $12.34.
+const INTL_LOCALES: Record<Locale, string> = { en: 'en-AU', 'zh-CN': 'zh-CN' }
+
+let LOCALE = INTL_LOCALES.en
+
+/** The language dates and amounts are written in; `I18nProvider` sets it. */
+export function setFormatLocale(locale: Locale) {
+  LOCALE = INTL_LOCALES[locale]
+}
 
 export function capitalise(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1)
@@ -28,10 +38,10 @@ export function previousMonth(month: string): string {
   return localMonth(new Date(y, m - 2, 1))
 }
 
-export function greeting(now: Date): string {
+export function partOfDay(now: Date): 'morning' | 'afternoon' | 'evening' {
   const hour = now.getHours()
-  if (hour < 12) return 'Good morning'
-  return hour < 18 ? 'Good afternoon' : 'Good evening'
+  if (hour < 12) return 'morning'
+  return hour < 18 ? 'afternoon' : 'evening'
 }
 
 export function formatDate(isoDate: string): string {

@@ -1,13 +1,16 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router'
 import { useAuth } from '../auth/useAuth'
+import { LanguageMenu } from '../i18n/LanguageMenu'
+import { useI18n } from '../i18n/useI18n'
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-lg px-3 py-1.5 text-sm ${isActive ? 'bg-indigo-50 font-medium text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`
 
-/** The bar above the signed-in pages: navigation, who's signed in, and sign out. */
+/** The bar above the signed-in pages: navigation, language, who's signed in, and sign out. */
 export function AppHeader({ actions }: { actions?: ReactNode }) {
   const { state, logout } = useAuth()
+  const { t } = useI18n()
   const user = state.status === 'signedIn' ? state.user : null
 
   return (
@@ -16,19 +19,20 @@ export function AppHeader({ actions }: { actions?: ReactNode }) {
         <span className="mr-2 text-lg font-semibold">Ledger</span>
         <nav className="flex gap-1">
           <NavLink to="/" end className={navClass}>
-            Home
+            {t.nav.home}
           </NavLink>
           <NavLink to="/chat" className={navClass}>
-            Chat
+            {t.nav.chat}
           </NavLink>
           {user?.role === 'admin' && (
             <NavLink to="/admin" className={navClass}>
-              Users
+              {t.nav.users}
             </NavLink>
           )}
         </nav>
         <div className="ml-auto flex items-center gap-2">
           {actions}
+          <LanguageMenu />
           <span className="hidden text-sm text-slate-500 sm:inline">
             {user?.username}
           </span>
@@ -37,7 +41,7 @@ export function AppHeader({ actions }: { actions?: ReactNode }) {
             onClick={logout}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
           >
-            Sign out
+            {t.nav.signOut}
           </button>
         </div>
       </div>

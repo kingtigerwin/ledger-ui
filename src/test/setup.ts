@@ -10,7 +10,11 @@ HTMLDialogElement.prototype.showModal = function () {
 }
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
-beforeEach(() => resetMockDb())
+beforeEach(() => {
+  resetMockDb()
+  // The language menu's choice lives here, and would otherwise carry into the next test.
+  localStorage.clear()
+})
 afterEach(() => {
   server.resetHandlers()
   cleanup()

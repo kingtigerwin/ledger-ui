@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
+import { I18nProvider } from '../i18n/I18nProvider'
 
 /** Renders the whole app at `path`, as a fresh page load would. */
 export function renderApp(path = '/') {
@@ -14,9 +15,11 @@ export function renderApp(path = '/') {
   render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </I18nProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   )

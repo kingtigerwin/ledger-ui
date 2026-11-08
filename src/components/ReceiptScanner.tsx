@@ -1,24 +1,15 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
-import type { ReadBill, ReceiptProblem, Transaction } from '../api/types'
+import type { ReadBill, Transaction } from '../api/types'
 import { CATEGORIES } from '../constants'
 import { formatCents, formatDate } from '../format'
 import { useReceipts } from '../hooks/useReceipts'
+import { categoryName } from '../i18n/categoryName'
+import type { Messages } from '../i18n/en'
+import { useI18n } from '../i18n/useI18n'
 import type { ReceiptEntry } from '../receipts/toTransaction'
 import { ReceiptItems } from './ReceiptItems'
 import { TransactionCard } from './TransactionCard'
 import { WaitingModal } from './WaitingModal'
-
-const PROBLEMS: Partial<Record<ReceiptProblem, string>> = {
-  merchant_unreadable: "The merchant couldn't be read.",
-  date_unreadable: "The date couldn't be read.",
-  date_in_future: 'The date is in the future.',
-  date_too_old: 'The date is over a year old.',
-  lines_dont_add_up: "The lines don't add up to the total.",
-  payments_dont_add_up: "The payments don't add up to the total.",
-}
-
-const ALREADY_RECORDED =
-  'This looks already recorded: there is a transaction with the same amount or receipt number that day.'
 
 const quietButtonClass =
   'rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50'
@@ -48,6 +39,7 @@ function ReceiptForm({
   onSave,
   onCancel,
 }: ReceiptFormProps) {
+  const { t } = useI18n()
   const [merchant, setMerchant] = useState(initial.merchant)
   const [date, setDate] = useState(initial.date)
   const [category, setCategory] = useState(initial.category)
@@ -78,7 +70,7 @@ function ReceiptForm({
       )}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm text-slate-600">
-          Merchant
+          {t.receipts.merchant}
           <input
             value={merchant}
             maxLength={100}
@@ -87,7 +79,7 @@ function ReceiptForm({
           />
         </label>
         <label className="text-sm text-slate-600">
-          Date
+          {t.receipts.date}
           <input
             type="date"
             value={date}
@@ -96,7 +88,7 @@ function ReceiptForm({
           />
         </label>
         <label className="text-sm text-slate-600">
-          Amount paid
+          {t.receipts.amountPaid}
           <input
             inputMode="decimal"
             value={amount}
@@ -105,15 +97,15 @@ function ReceiptForm({
           />
         </label>
         <label className="text-sm text-slate-600">
-          Category
+          {t.receipts.category}
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className={`${fieldClass} capitalize`}
+            className={fieldClass}
           >
             {CATEGORIES.map((name) => (
               <option key={name} value={name}>
-                {name}
+                {categoryName(t, name)}
               </option>
             ))}
           </select>
@@ -121,29 +113,30 @@ function ReceiptForm({
       </div>
       <div className="mt-3 flex justify-end gap-2">
         <button type="button" onClick={onCancel} className={quietButtonClass}>
-          Cancel
+          {t.common.cancel}
         </button>
         <button
           type="submit"
           disabled={!canSave}
           className={primaryButtonClass}
         >
-          Save
+          {t.common.save}
         </button>
       </div>
     </form>
   )
 }
 
-/** "This is a bill from Whitehorse City Council for council rates: $583.00, due 30 Nov 2026." */
-function describeBill({ biller, item, amountCents, dueDate }: ReadBill) {
-  const amount = `${formatCents(amountCents)}${dueDate ? `, due ${formatDate(dueDate)}` : ''}`
-  const what = [biller && `from ${biller}`, item && `for ${item}`]
-    .filter(Boolean)
-    .join(' ')
-  return what
-    ? `This is a bill ${what}: ${amount}.`
-    : `This is a bill for ${amount}.`
+function describeBill(
+  t: Messages,
+  { biller, item, amountCents, dueDate }: ReadBill,
+) {
+  return t.receipts.describeBill({
+    biller: biller ?? undefined,
+    item: item ?? undefined,
+    amount: formatCents(amountCents),
+    due: dueDate ? formatDate(dueDate) : undefined,
+  })
 }
 
 function BillQuestion({
@@ -157,15 +150,16 @@ function BillQuestion({
   onYes: () => void
   onNo: () => void
 }) {
+  const { t } = useI18n()
   return (
     <div
       role="group"
-      aria-label="Bill"
+      aria-label={t.receipts.bill}
       className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
     >
-      <p className="text-sm text-slate-700">{describeBill(bill)}</p>
+      <p className="text-sm text-slate-700">{describeBill(t, bill)}</p>
       <p className="mt-1 text-sm font-medium text-slate-900">
-        Have you paid it?
+        {t.receipts.havePaid}
       </p>
       {saveError && (
         <p role="alert" className="mt-2 text-sm text-red-700">
@@ -174,10 +168,10 @@ function BillQuestion({
       )}
       <div className="mt-3 flex justify-end gap-2">
         <button type="button" onClick={onNo} className={quietButtonClass}>
-          No
+          {t.receipts.no}
         </button>
         <button type="button" onClick={onYes} className={primaryButtonClass}>
-          Yes
+          {t.receipts.yes}
         </button>
       </div>
     </div>
@@ -195,28 +189,34 @@ function Recorded({
 }) {
   const { amountCents, currency, merchant, receipt } = transaction
   const points = receipt?.payments?.filter((p) => p.kind === 'points') ?? []
+  const { t } = useI18n()
 
   return (
     <div>
       <div role="status" className="text-sm text-slate-700">
         <p>
-          Recorded {formatCents(amountCents, currency)}
-          {merchant && ` at ${merchant}`}.
+          {t.receipts.recordedAmount(
+            formatCents(amountCents, currency),
+            merchant,
+          )}
         </p>
         {points.map((p) => (
           <p key={p.label} className="text-slate-500">
-            {p.label} paid {formatCents(p.amountCents, currency)}.
+            {t.receipts.pointsPaid(
+              p.label,
+              formatCents(p.amountCents, currency),
+            )}
           </p>
         ))}
       </div>
-      <TransactionCard title="Recorded" transactions={[transaction]} />
+      <TransactionCard kind="recorded" transactions={[transaction]} />
       <ReceiptItems transaction={transaction} />
       <div className="mt-2 flex justify-end gap-2">
         <button type="button" onClick={onEdit} className={quietButtonClass}>
-          Edit
+          {t.receipts.edit}
         </button>
         <button type="button" onClick={onUndo} className={quietButtonClass}>
-          Undo
+          {t.receipts.undo}
         </button>
       </div>
     </div>
@@ -235,6 +235,7 @@ export function ReceiptScanner() {
     cancelEdit,
     close,
   } = useReceipts()
+  const { t } = useI18n()
   const busy = stage.name === 'reading'
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -247,10 +248,10 @@ export function ReceiptScanner() {
   const photoButtonClass = `${quietButtonClass} ${busy ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} focus-within:ring-2 focus-within:ring-indigo-200`
 
   return (
-    <section className="flex flex-col gap-3" aria-label="Scan a receipt">
+    <section className="flex flex-col gap-3" aria-label={t.receipts.section}>
       <div className="flex flex-wrap items-center gap-2">
         <label className={photoButtonClass}>
-          Take photo
+          {t.receipts.takePhoto}
           <input
             type="file"
             accept="image/*"
@@ -261,7 +262,7 @@ export function ReceiptScanner() {
           />
         </label>
         <label className={photoButtonClass}>
-          Upload photo or PDF
+          {t.receipts.upload}
           <input
             type="file"
             accept="image/*,application/pdf"
@@ -270,11 +271,11 @@ export function ReceiptScanner() {
             className="sr-only"
           />
         </label>
-        <span className="text-sm text-slate-500">of a receipt</span>
+        <span className="text-sm text-slate-500">{t.receipts.ofReceipt}</span>
       </div>
 
       {stage.name === 'reading' && (
-        <WaitingModal message="Your receipt is uploading, please wait…" />
+        <WaitingModal message={t.receipts.uploading} />
       )}
       {stage.name === 'failed' && (
         <p role="alert" className="text-sm text-red-700">
@@ -297,8 +298,8 @@ export function ReceiptScanner() {
           key={stage.id}
           initial={stage.entry}
           warnings={[
-            ...(stage.alreadyRecorded ? [ALREADY_RECORDED] : []),
-            ...stage.problems.flatMap((p) => PROBLEMS[p] ?? []),
+            ...(stage.alreadyRecorded ? [t.receipts.alreadyRecorded] : []),
+            ...stage.problems.flatMap((p) => t.receipts.problems[p] ?? []),
             ...(stage.saveError ? [stage.saveError] : []),
           ]}
           onSave={saveReview}

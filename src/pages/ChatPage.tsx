@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { EXAMPLE_PROMPTS } from '../constants'
 import { AppHeader } from '../components/AppHeader'
 import { ChatInput } from '../components/ChatInput'
 import { MessageList } from '../components/MessageList'
 import { useChat } from '../chat/useChat'
+import { useI18n } from '../i18n/useI18n'
 
 export function ChatPage() {
   const { messages, isThinking, send, retry, reset } = useChat()
+  const { t } = useI18n()
   const [draft, setDraft] = useState('')
   const isEmpty = messages.length === 0 && !isThinking
 
@@ -37,7 +38,7 @@ export function ChatPage() {
               }}
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
             >
-              New chat
+              {t.chat.newChat}
             </button>
           )
         }
@@ -49,19 +50,16 @@ export function ChatPage() {
           <div className="m-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
             <div className="text-center">
               <h2 className="text-2xl font-semibold text-slate-800">
-                What did you spend today?
+                {t.chat.emptyTitle}
               </h2>
-              <p className="mt-1 text-slate-500">
-                Describe your purchases in your own words, or ask about your
-                spending.
-              </p>
+              <p className="mt-1 text-slate-500">{t.chat.emptyBody}</p>
             </div>
             {input}
             <div className="flex flex-col gap-2">
               <p className="text-sm font-medium text-slate-500">
-                Try an example:
+                {t.chat.tryExample}
               </p>
-              {EXAMPLE_PROMPTS.map((prompt) => (
+              {t.chat.examples.map((prompt) => (
                 <button
                   key={prompt}
                   type="button"
