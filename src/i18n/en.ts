@@ -142,6 +142,7 @@ export const en = {
     found: 'Found',
     unknownUser: 'Unknown user',
     subtotals: 'Subtotals by person',
+    couldntLoadItems: "Couldn't load the items.",
   },
   purchases: {
     range: (from: string, to: string) => `${from} to ${to}`,
