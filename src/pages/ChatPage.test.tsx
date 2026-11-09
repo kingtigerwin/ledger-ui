@@ -301,6 +301,138 @@ describe('given sisi, an admin, on the chat page', () => {
   })
 })
 
+const scanned = {
+  item: '2 items',
+  merchant: 'Coles',
+  receipt: {
+    totalCents: 1200,
+    location: 'Box Hill',
+    lines: [
+      {
+        name: 'CLS CHKN DRUMSTICKS',
+        product: 'chicken drumsticks',
+        amountCents: 899,
+      },
+      { name: 'BANANAS', amountCents: 301 },
+    ],
+  },
+}
+
+describe('given a found transaction from a scanned receipt', () => {
+  async function listOwn(listed: object[]) {
+    server.use(
+      http.post('*/agent/v1/chat', () =>
+        HttpResponse.json({
+          reply: 'Here are your transactions.',
+          transactions: [],
+          listed,
+          summaries: [],
+        }),
+      ),
+    )
+    const { user, input } = await openChat()
+    await user.type(input, 'What did I buy?{Enter}')
+    await screen.findByText('Here are your transactions.')
+    return user
+  }
+
+  it("shows the receipt's items when alice opens it", async () => {
+    seedTransaction('alice', 1200, { id: 'txn-scanned', ...scanned })
+    // The agent's lists leave the lines out, as ledger-api's MCP tools do.
+    const user = await listOwn([
+      {
+        id: 'txn-scanned',
+        date: '2026-10-27',
+        category: 'groceries',
+        amountCents: 1200,
+        currency: 'AUD',
+        ...scanned,
+        receipt: { totalCents: 1200, location: 'Box Hill' },
+      },
+    ])
+
+    const row = screen.getByRole('button', { name: /2 items/ })
+    expect(row).toHaveAttribute('aria-expanded', 'false')
+    await user.click(row)
+
+    const items = await screen.findByRole('list', { name: 'Receipt items' })
+    expect(
+      within(items)
+        .getAllByRole('listitem')
+        .map((line) => line.textContent),
+    ).toEqual(['Chicken drumsticksCLS CHKN DRUMSTICKS$8.99', 'BANANAS$3.01'])
+    expect(row).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(row)
+    expect(screen.queryByRole('list', { name: 'Receipt items' })).toBeNull()
+  })
+
+  it('offers to try again when the items fail to load', async () => {
+    server.use(
+      http.get('*/api/v1/transactions/:id', () =>
+        HttpResponse.json(
+          { error: { code: 'internal_error', message: 'boom' } },
+          { status: 500 },
+        ),
+      ),
+    )
+    const user = await listOwn([
+      {
+        id: 'txn-scanned',
+        date: '2026-10-27',
+        category: 'groceries',
+        amountCents: 1200,
+        currency: 'AUD',
+        ...scanned,
+        receipt: { totalCents: 1200 },
+      },
+    ])
+
+    await user.click(screen.getByRole('button', { name: /2 items/ }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/couldn't load the items/i)
+    expect(
+      within(alert).getByRole('button', { name: 'Try again' }),
+    ).toBeInTheDocument()
+  })
+
+  it("doesn't offer to open a typed expense, which has no items", async () => {
+    await listOwn([
+      {
+        id: 'txn-typed',
+        date: '2026-10-27',
+        category: 'dining',
+        item: 'coffee',
+        amountCents: 500,
+        currency: 'AUD',
+      },
+    ])
+
+    expect(screen.getByText('coffee')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /coffee/ })).toBeNull()
+  })
+})
+
+describe('given sisi listing a customer receipt', () => {
+  it("shows that customer's receipt items when she opens it", async () => {
+    seedTransaction('alice', 1200, scanned)
+    const app = renderApp('/login')
+    await signIn(app.user, 'sisi', 'sisi-password')
+    await app.user.click(await screen.findByRole('link', { name: 'Chat' }))
+    await app.user.type(
+      await screen.findByLabelText(/describe your spending/i),
+      "Show everyone's transactions{Enter}",
+    )
+    await screen.findByText("Here are everyone's transactions.")
+
+    await app.user.click(screen.getByRole('button', { name: /2 items/ }))
+
+    const items = await screen.findByRole('list', { name: 'Receipt items' })
+    expect(within(items).getAllByRole('listitem')).toHaveLength(2)
+  })
+})
+
 describe('given sisi on the chat page', () => {
   it('tells her about her higher daily limit', async () => {
     const app = renderApp('/login')

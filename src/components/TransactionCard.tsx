@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import type { Transaction } from '../api/types'
 import { formatCents, formatDate } from '../format'
+import { useTransaction } from '../hooks/useTransaction'
 import { useI18n } from '../i18n/useI18n'
+import { ReceiptItems } from './ReceiptItems'
 
 interface TransactionCardProps {
   kind: 'recorded' | 'found'
@@ -22,7 +25,37 @@ function subtotalsByOwner(
   return [...subtotals.values()]
 }
 
+/** A receipt's lines, loaded when its row is opened: the agent's lists leave them out. */
+function TransactionDetails({ transaction }: { transaction: Transaction }) {
+  const full = useTransaction(transaction)
+  const { t } = useI18n()
+
+  if (full.isPending) {
+    return <p className="px-3 pb-2 text-slate-400">{t.common.loading}</p>
+  }
+  if (full.isError) {
+    return (
+      <p role="alert" className="px-3 pb-2 text-red-700">
+        {t.transactions.couldntLoadItems}{' '}
+        <button
+          type="button"
+          onClick={() => full.refetch()}
+          className="underline"
+        >
+          {t.common.tryAgain}
+        </button>
+      </p>
+    )
+  }
+  return (
+    <div className="px-3 pb-2">
+      <ReceiptItems transaction={full.data} />
+    </div>
+  )
+}
+
 export function TransactionCard({ kind, transactions }: TransactionCardProps) {
+  const [openId, setOpenId] = useState<string | null>(null)
   const { t } = useI18n()
   const ownerName = (txn: Transaction) =>
     txn.username ?? t.transactions.unknownUser
@@ -44,29 +77,56 @@ export function TransactionCard({ kind, transactions }: TransactionCardProps) {
         {t.transactions[kind]}
       </div>
       <ul className="divide-y divide-slate-100">
-        {transactions.map((txn) => (
-          <li
-            key={txn.id}
-            className="flex items-start justify-between gap-3 px-3 py-2"
-          >
-            <div className="min-w-0">
-              <div className="font-medium text-slate-900">{txn.item}</div>
-              <div className="text-xs text-slate-500">
-                {[
-                  showOwners && ownerName(txn),
-                  t.categories[txn.category] ?? txn.category,
-                  txn.merchant,
-                  formatDate(txn.date),
-                ]
-                  .filter(Boolean)
-                  .join(t.common.separator)}
-              </div>
-            </div>
-            <div className="shrink-0 font-medium tabular-nums">
-              {formatCents(txn.amountCents, txn.currency)}
-            </div>
-          </li>
-        ))}
+        {transactions.map((txn) => {
+          // Where a receipt was just recorded, its lines are already shown under the card.
+          const opens = kind === 'found' && !!txn.receipt
+          const open = openId === txn.id
+          const row = (
+            <>
+              <span className="min-w-0">
+                <span className="block font-medium text-slate-900">
+                  {opens && (
+                    <span aria-hidden="true" className="mr-1 text-slate-400">
+                      {open ? '▾' : '▸'}
+                    </span>
+                  )}
+                  {txn.item}
+                </span>
+                <span className="block text-xs text-slate-500">
+                  {[
+                    showOwners && ownerName(txn),
+                    t.categories[txn.category] ?? txn.category,
+                    txn.merchant,
+                    formatDate(txn.date),
+                  ]
+                    .filter(Boolean)
+                    .join(t.common.separator)}
+                </span>
+              </span>
+              <span className="shrink-0 font-medium tabular-nums">
+                {formatCents(txn.amountCents, txn.currency)}
+              </span>
+            </>
+          )
+          const rowClass = 'flex items-start justify-between gap-3 px-3 py-2'
+          return (
+            <li key={txn.id}>
+              {opens ? (
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenId(open ? null : txn.id)}
+                  className={`${rowClass} w-full text-left hover:bg-slate-50`}
+                >
+                  {row}
+                </button>
+              ) : (
+                <div className={rowClass}>{row}</div>
+              )}
+              {open && <TransactionDetails transaction={txn} />}
+            </li>
+          )
+        })}
       </ul>
       {subtotals.length > 1 && (
         <ul

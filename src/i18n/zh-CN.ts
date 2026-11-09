@@ -121,6 +121,7 @@ export const zhCN: Messages = {
     found: '找到的记录',
     unknownUser: '未知用户',
     subtotals: '按人小计',
+    couldntLoadItems: '无法加载商品明细。',
   },
   purchases: {
     range: (from, to) => `${from} 至 ${to}`,

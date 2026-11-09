@@ -131,6 +131,21 @@ const newTransaction = (
 
 const withoutOwner = ({ userId: _userId, ...t }: MockTransaction) => t
 
+/** As ledger-api's MCP list tools return a transaction: without its receipt's lines. */
+function withoutLines<T extends Transaction>(t: T): T {
+  if (!t.receipt) return t
+  const { lines: _lines, ...receipt } = t.receipt
+  return { ...t, receipt }
+}
+
+const findTransaction = (userId: string, id: unknown) =>
+  db.transactions.find((t) => t.id === id && t.userId === userId)
+
+const transactionOr404 = (t: MockTransaction | undefined) =>
+  t
+    ? HttpResponse.json(withoutOwner(t))
+    : apiError(404, 'transaction_not_found', 'No such transaction')
+
 /** Makes every access token issued so far be refused, as if 15 minutes had passed. */
 export function expireAccessTokens() {
   db.tokenGeneration++
@@ -247,7 +262,7 @@ function chat(user: MockUser, { messages }: ChatRequest): ChatResponse {
       ...empty,
       reply: "Here are everyone's transactions.",
       listed: db.transactions.map((t) => ({
-        ...t,
+        ...withoutLines(t),
         username: db.users.get(t.userId)?.username ?? null,
       })),
     }
@@ -434,6 +449,22 @@ export const handlers = [
         .map(withoutOwner)
       return HttpResponse.json({ items, nextCursor: null })
     }),
+  ),
+
+  http.get(
+    '*/api/v1/transactions/:id',
+    withUser((user, { params }) =>
+      transactionOr404(findTransaction(user.id, params.id)),
+    ),
+  ),
+
+  http.get(
+    '*/api/v1/admin/users/:id/transactions/:transactionId',
+    withAdmin(({ params }) =>
+      transactionOr404(
+        findTransaction(String(params.id), params.transactionId),
+      ),
+    ),
   ),
 
   http.post(
